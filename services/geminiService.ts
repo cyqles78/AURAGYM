@@ -1,3 +1,5 @@
+
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { WorkoutPlan, Recipe, Program, ProgramDayProgressRequest, ProgramDayProgressResult, WeeklyMealPlan } from "../types";
 
@@ -69,6 +71,43 @@ export const generateAIWorkout = async (userGoal: string, level: string, equipme
     console.error("Error generating workout:", error);
     return null;
   }
+};
+
+// --- EXERCISE SUGGESTION ---
+
+export const suggestExerciseDetails = async (exerciseName: string): Promise<{ targetMuscle: string, equipment: string } | null> => {
+    if (!apiKey || !exerciseName) return null;
+    
+    const model = "gemini-2.5-flash";
+    const prompt = `Identify the primary target muscle group and standard equipment needed for the exercise: "${exerciseName}".
+    Return a strictly valid JSON object with 'targetMuscle' and 'equipment' fields.
+    Use standard terms like 'Chest', 'Back', 'Legs', 'Barbell', 'Dumbbell', 'Bodyweight'.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        targetMuscle: { type: Type.STRING },
+                        equipment: { type: Type.STRING }
+                    },
+                    required: ['targetMuscle', 'equipment']
+                }
+            }
+        });
+
+        const text = response.text;
+        if (!text) return null;
+        return JSON.parse(text);
+
+    } catch (error) {
+        console.error("Error suggesting exercise details:", error);
+        return null;
+    }
 };
 
 export interface RecipePreferences {

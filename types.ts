@@ -1,4 +1,5 @@
 
+
 export interface Exercise {
   id: string;
   name: string;
@@ -7,6 +8,7 @@ export interface Exercise {
   sets: WorkoutSet[];
   notes?: string;
   restTimeSeconds: number; // e.g. 90
+  videoUrl?: string; // New field for video links
 }
 
 export interface WorkoutSet {

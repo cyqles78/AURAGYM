@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, WorkoutSession, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, MealType, WeightGoal, MacroTargets } from './types';
+import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, WorkoutSession, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, MealType, WeightGoal, MacroTargets, Exercise } from './types';
 import { Navigation } from './components/Navigation';
 import { DashboardView } from './views/DashboardView';
 import { WorkoutsView } from './views/WorkoutsView';
@@ -10,6 +10,7 @@ import { BodyView } from './views/BodyView';
 import { MoreView } from './views/MoreView';
 import { ArrowLeft } from 'lucide-react';
 import { usePersistentState } from './hooks/usePersistentState';
+import { DEFAULT_EXERCISES } from './services/DataService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
@@ -89,6 +90,11 @@ const App: React.FC = () => {
       ]
     }
   ]);
+
+  const [customExercises, setCustomExercises] = usePersistentState<Exercise[]>('auragym_custom_exercises', []);
+  
+  // Merge default exercises with user custom exercises for the full library
+  const fullExerciseLibrary = [...DEFAULT_EXERCISES, ...customExercises];
 
   const [programs, setPrograms] = usePersistentState<Program[]>('auragym_programs', []);
 
@@ -254,6 +260,10 @@ const App: React.FC = () => {
     setPrograms(prev => prev.map(p => p.id === updatedProgram.id ? updatedProgram : p));
   };
 
+  const handleAddCustomExercise = (ex: Exercise) => {
+      setCustomExercises(prev => [...prev, ex]);
+  };
+
   const renderView = () => {
     switch (currentView) {
       case 'DASHBOARD':
@@ -263,9 +273,11 @@ const App: React.FC = () => {
           <WorkoutsView 
             plans={workouts} 
             programs={programs}
+            customExercises={fullExerciseLibrary}
             onAddPlan={(p) => setWorkouts([p, ...workouts])} 
             onAddProgram={(p) => setPrograms([p, ...programs])}
             onUpdateProgram={handleUpdateProgram}
+            onAddCustomExercise={handleAddCustomExercise}
             onCompleteSession={handleCompleteSession}
             completedWorkouts={completedWorkouts}
             exerciseHistory={exerciseHistory}

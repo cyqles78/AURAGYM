@@ -1,5 +1,22 @@
 
-import { WeightEntry, CompletedWorkout, WorkoutSession } from '../types';
+
+import { WeightEntry, CompletedWorkout, Exercise } from '../types';
+
+// Default Library Exercises
+export const DEFAULT_EXERCISES: Exercise[] = [
+  { id: 'def_1', name: 'Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 120, sets: [] },
+  { id: 'def_2', name: 'Squat', targetMuscle: 'Legs', equipment: 'Barbell', restTimeSeconds: 180, sets: [] },
+  { id: 'def_3', name: 'Deadlift', targetMuscle: 'Back', equipment: 'Barbell', restTimeSeconds: 180, sets: [] },
+  { id: 'def_4', name: 'Overhead Press', targetMuscle: 'Shoulders', equipment: 'Barbell', restTimeSeconds: 120, sets: [] },
+  { id: 'def_5', name: 'Dumbbell Row', targetMuscle: 'Back', equipment: 'Dumbbells', restTimeSeconds: 90, sets: [] },
+  { id: 'def_6', name: 'Pull Up', targetMuscle: 'Back', equipment: 'Bodyweight', restTimeSeconds: 90, sets: [] },
+  { id: 'def_7', name: 'Push Up', targetMuscle: 'Chest', equipment: 'Bodyweight', restTimeSeconds: 60, sets: [] },
+  { id: 'def_8', name: 'Dumbbell Curl', targetMuscle: 'Biceps', equipment: 'Dumbbells', restTimeSeconds: 60, sets: [] },
+  { id: 'def_9', name: 'Tricep Extension', targetMuscle: 'Triceps', equipment: 'Cable', restTimeSeconds: 60, sets: [] },
+  { id: 'def_10', name: 'Leg Press', targetMuscle: 'Legs', equipment: 'Machine', restTimeSeconds: 120, sets: [] },
+  { id: 'def_11', name: 'Lat Pulldown', targetMuscle: 'Back', equipment: 'Cable', restTimeSeconds: 90, sets: [] },
+  { id: 'def_12', name: 'Lateral Raise', targetMuscle: 'Shoulders', equipment: 'Dumbbells', restTimeSeconds: 60, sets: [] },
+];
 
 // Mock Data
 const MOCK_WEIGHT_HISTORY: WeightEntry[] = [
