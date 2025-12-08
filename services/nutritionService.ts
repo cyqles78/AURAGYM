@@ -4,7 +4,7 @@ import { SearchableFoodItem } from '../types';
 // In a real app, this should be in an environment variable
 // For this demo, we'll assume the user has set it up or we use a fallback/demo key if available
 // Note: USDA API Key is free to get at https://fdc.nal.usda.gov/api-key-signup.html
-const USDA_API_KEY = process.env.USDA_API_KEY || 'DEMO_KEY'; 
+const USDA_API_KEY = 'JQKlBZClaC3kFXsxKzaPSsNRPegg8ydUXgRz0WdI'; 
 const BASE_URL = 'https://api.nal.usda.gov/fdc/v1';
 
 // Fallback data to use when API rate limits (429) are hit or network fails

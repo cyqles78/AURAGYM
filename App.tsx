@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, WorkoutSession, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, MealType, WeightGoal, MacroTargets } from './types';
 import { Navigation } from './components/Navigation';
@@ -295,7 +297,12 @@ const App: React.FC = () => {
           />
         );
       case 'MORE':
-        return <MoreView user={user} onUpdateUser={setUser} />;
+        return (
+          <MoreView 
+            user={user} 
+            onUpdateUser={setUser} 
+          />
+        );
       default:
         return <DashboardView stats={stats} onNavigate={handleNavigate} />;
     }

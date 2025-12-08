@@ -238,3 +238,18 @@ export interface SearchableFoodItem {
   servingSize?: number;
   servingUnit?: string;
 }
+
+// --- PROGRESS TRACKING ---
+
+export interface TimeSeriesDataPoint {
+  date: string; // YYYY-MM-DD
+  value: number;
+}
+
+export interface MetricSummary {
+  current: number;
+  start: number;
+  change: number;
+  percentageChange: number;
+  allTimeHigh: number;
+}

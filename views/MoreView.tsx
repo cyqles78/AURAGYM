@@ -2,14 +2,15 @@
 import React, { useState } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { UserProfile } from '../types';
-import { Settings, CreditCard, Shield, HelpCircle, LogOut, ChevronRight, Crown, Mail, Smartphone, ArrowLeft, Bell, Moon, User, Check, Edit2 } from 'lucide-react';
+import { Settings, CreditCard, Shield, HelpCircle, LogOut, ChevronRight, Crown, Mail, Smartphone, ArrowLeft, TrendingUp, Moon, User, Check, Edit2 } from 'lucide-react';
+import { ProgressScreen } from './Profile/ProgressScreen';
 
 interface MoreViewProps {
   user: UserProfile;
   onUpdateUser: (user: UserProfile) => void;
 }
 
-type SubView = 'MAIN' | 'PROFILE' | 'APPEARANCE' | 'NOTIFICATIONS' | 'SUBSCRIPTION' | 'PRIVACY' | 'HELP';
+type SubView = 'MAIN' | 'PROFILE' | 'APPEARANCE' | 'NOTIFICATIONS' | 'SUBSCRIPTION' | 'PRIVACY' | 'HELP' | 'PROGRESS';
 
 export const MoreView: React.FC<MoreViewProps> = ({ user, onUpdateUser }) => {
   const [subView, setSubView] = useState<SubView>('MAIN');
@@ -32,6 +33,12 @@ export const MoreView: React.FC<MoreViewProps> = ({ user, onUpdateUser }) => {
   );
 
   // --- SUB-VIEWS ---
+
+  if (subView === 'PROGRESS') {
+      return (
+          <ProgressScreen onBack={() => setSubView('MAIN')} />
+      );
+  }
 
   if (subView === 'PROFILE') {
       return (
@@ -257,6 +264,14 @@ export const MoreView: React.FC<MoreViewProps> = ({ user, onUpdateUser }) => {
 
       {/* Settings Groups */}
       <div className="space-y-4">
+
+        {/* Analytics Section */}
+        <div className="space-y-1">
+            <h3 className="text-xs font-bold text-slate-500 uppercase px-2 mb-2">Analytics</h3>
+            <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
+                <SettingItem icon={TrendingUp} label="Progress Tracking" subLabel="Detailed Charts" onClick={() => setSubView('PROGRESS')} />
+            </div>
+        </div>
         
         {/* App Settings */}
         <div className="space-y-1">
