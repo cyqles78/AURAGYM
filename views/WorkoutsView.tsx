@@ -1,10 +1,10 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { GlassCard } from '../components/GlassCard';
-import { WorkoutPlan, WorkoutSession, Exercise, WorkoutSet, Program, ProgramDay, ProgramWeek, CompletedWorkout, ExercisePerformanceEntry, ProgramDayProgressRequest, ProgramDayProgressResult } from '../types';
+import { WorkoutPlan, WorkoutSession, Program, ProgramDay, CompletedWorkout, ExercisePerformanceEntry, ProgramDayProgressRequest, ProgramDayProgressResult } from '../types';
 import { generateAIWorkout, generateAIProgram, ProgramContextInput, generateProgressedProgramDay } from '../services/geminiService';
-import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, CheckCircle2, Pause, ArrowLeft, MoreHorizontal, Dumbbell, Trash2, Search, X, Calendar, Layers, ChevronDown, History, Trophy, TrendingUp, AlertCircle, Minus, Activity } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, LineChart, Line, Cell } from 'recharts';
+import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calendar, Layers, ChevronDown, History, Trophy, TrendingUp, AlertCircle, X, Dumbbell } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, Cell, XAxis, YAxis, AreaChart, Area, Tooltip, CartesianGrid } from 'recharts';
+import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 
 interface WorkoutsViewProps {
   plans: WorkoutPlan[];
@@ -38,8 +38,6 @@ interface ComputedExerciseStats {
 export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ plans = [], programs = [], onAddPlan, onAddProgram, onUpdateProgram, onCompleteSession, completedWorkouts = [], exerciseHistory = [] }) => {
   const [viewMode, setViewMode] = useState<WorkoutsMode>('LIST');
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
-  const [timer, setTimer] = useState(0);
-  const [timerRunning, setTimerRunning] = useState(false);
 
   // Single Workout Generator State
   const [goal, setGoal] = useState('Hypertrophy');
@@ -73,15 +71,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ plans = [], programs
 
   // Exercise Detail Modal State
   const [selectedExerciseStats, setSelectedExerciseStats] = useState<ComputedExerciseStats | null>(null);
-
-  // Active Session Timer Logic
-  useEffect(() => {
-    let interval: any;
-    if (timerRunning) {
-      interval = setInterval(() => setTimer(t => t + 1), 1000);
-    }
-    return () => clearInterval(interval);
-  }, [timerRunning]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -174,8 +163,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ plans = [], programs
     };
     setActiveSession(newSession);
     setViewMode('ACTIVE_SESSION');
-    setTimer(0);
-    setTimerRunning(true);
   };
 
   const handleStartProgramDay = (program: Program, day: ProgramDay) => {
@@ -189,72 +176,17 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ plans = [], programs
       };
       setActiveSession(newSession);
       setViewMode('ACTIVE_SESSION');
-      setTimer(0);
-      setTimerRunning(true);
   };
 
-  const handleToggleSet = (exerciseIndex: number, setIndex: number) => {
-    if (!activeSession || !activeSession.exercises) return;
-    const updatedExercises = [...activeSession.exercises];
-    if (updatedExercises[exerciseIndex] && updatedExercises[exerciseIndex].sets[setIndex]) {
-        updatedExercises[exerciseIndex].sets[setIndex].completed = !updatedExercises[exerciseIndex].sets[setIndex].completed;
-        setActiveSession({ ...activeSession, exercises: updatedExercises });
-    }
-  };
-
-  const handleSetChange = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
-    if (!activeSession || !activeSession.exercises) return;
-    const updatedExercises = activeSession.exercises.map((ex, exIdx) => {
-      if (exIdx !== exerciseIndex) return ex;
-      return {
-        ...ex,
-        sets: ex.sets.map((s, sIdx) => 
-          sIdx === setIndex ? { ...s, [field]: value } : s
-        )
-      };
-    });
-    setActiveSession({ ...activeSession, exercises: updatedExercises });
-  };
-
-  const handleAddSet = (exerciseIndex: number) => {
-    if (!activeSession || !activeSession.exercises) return;
-    const updatedExercises = activeSession.exercises.map((ex, exIdx) => {
-      if (exIdx !== exerciseIndex) return ex;
-      // Copy previous set values or default
-      const prevSet = ex.sets[ex.sets.length - 1];
-      const newSet: WorkoutSet = {
-        id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString()) + Math.random(),
-        reps: prevSet ? prevSet.reps : '8',
-        weight: prevSet ? prevSet.weight : '0',
-        completed: false
-      };
-      return { ...ex, sets: [...ex.sets, newSet] };
-    });
-    setActiveSession({ ...activeSession, exercises: updatedExercises });
-  };
-
-  const handleRemoveSet = (exerciseIndex: number) => {
-    if (!activeSession || !activeSession.exercises) return;
-    const updatedExercises = activeSession.exercises.map((ex, exIdx) => {
-      if (exIdx !== exerciseIndex) return ex;
-      if (ex.sets.length <= 1) return ex; // Prevent removing the last set
-      return { ...ex, sets: ex.sets.slice(0, -1) };
-    });
-    setActiveSession({ ...activeSession, exercises: updatedExercises });
-  };
-
-  const handleFinishWorkout = () => {
-    if (!activeSession) return;
-    setTimerRunning(false);
-
+  const handleSessionFinished = (finishedSession: WorkoutSession) => {
     // 1. Calculate Stats & PRs
     const completedAt = new Date().toISOString();
-    const completedWorkoutId = activeSession.id;
+    const completedWorkoutId = finishedSession.id;
     let totalVolume = 0;
     let totalSets = 0;
     const performanceEntries: ExercisePerformanceEntry[] = [];
 
-    activeSession.exercises.forEach(ex => {
+    finishedSession.exercises.forEach(ex => {
         const validSets = ex.sets.filter(s => {
            const r = parseFloat(s.reps);
            const w = parseFloat(s.weight);
@@ -300,12 +232,12 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ plans = [], programs
 
     // 2. Determine Session Name
     let sessionName = 'Workout';
-    if (activeSession.programId && activeSession.programDayId) {
-        const prog = programs.find(p => p.id === activeSession.programId);
-        const day = prog?.weeks?.flatMap(w => w.days).find(d => d.id === activeSession.programDayId);
+    if (finishedSession.programId && finishedSession.programDayId) {
+        const prog = programs.find(p => p.id === finishedSession.programId);
+        const day = prog?.weeks?.flatMap(w => w.days).find(d => d.id === finishedSession.programDayId);
         if (day) sessionName = day.name;
-    } else if (activeSession.planId) {
-        const plan = plans.find(p => p.id === activeSession.planId);
+    } else if (finishedSession.planId) {
+        const plan = plans.find(p => p.id === finishedSession.planId);
         if (plan) sessionName = plan.title;
     }
 
@@ -313,16 +245,16 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ plans = [], programs
     const completedWorkout: CompletedWorkout = {
         id: completedWorkoutId,
         completedAt,
-        session: { ...activeSession, endTime: Date.now(), status: 'completed' },
+        session: { ...finishedSession, status: 'completed' },
         summary: {
             name: sessionName,
-            totalExercises: activeSession.exercises.length,
+            totalExercises: finishedSession.exercises.length,
             totalSets,
             estimatedVolume: totalVolume,
-            sourceType: activeSession.programId ? 'PROGRAM_DAY' : activeSession.planId ? 'PLAN' : 'AD_HOC',
-            planId: activeSession.planId,
-            programId: activeSession.programId,
-            programDayId: activeSession.programDayId
+            sourceType: finishedSession.programId ? 'PROGRAM_DAY' : finishedSession.planId ? 'PLAN' : 'AD_HOC',
+            planId: finishedSession.planId,
+            programId: finishedSession.programId,
+            programDayId: finishedSession.programDayId
         }
     };
 
@@ -525,87 +457,14 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ plans = [], programs
 
   // --- SUB-VIEWS ---
 
-  // 1. ACTIVE SESSION
+  // 1. ACTIVE SESSION (USING NEW SCREEN)
   if (viewMode === 'ACTIVE_SESSION' && activeSession) {
     return (
-        <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-bottom">
-            {/* Session Header */}
-            <div className="bg-surface p-4 pt-12 pb-4 sticky top-0 z-10 flex justify-between items-center border-b border-border">
-                <div className="flex flex-col">
-                    <h2 className="text-lg font-bold text-white">Active Session</h2>
-                    <span className="text-white font-mono text-xl font-bold tracking-widest">{formatTime(timer)}</span>
-                </div>
-                <button 
-                    onClick={handleFinishWorkout}
-                    className="bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 active:scale-95 transition-transform"
-                >
-                    Finish
-                </button>
-            </div>
-
-            {/* Exercises List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-8 pb-24">
-                {(activeSession.exercises || []).map((exercise, exIdx) => (
-                    <div key={exercise.id + exIdx} className="space-y-4">
-                        <div className="flex justify-between items-end border-b border-border pb-2">
-                            <h3 className="text-xl font-bold text-white">{exercise.name}</h3>
-                        </div>
-                        
-                        <div className="grid grid-cols-[30px_1fr_1fr_40px] gap-3 px-1 text-xs text-secondary uppercase font-bold tracking-wider">
-                            <span>Set</span>
-                            <span className="text-center">kg</span>
-                            <span className="text-center">Reps</span>
-                            <span></span>
-                        </div>
-
-                        {(exercise.sets || []).map((set, setIdx) => (
-                            <div 
-                                key={set.id} 
-                                className={`grid grid-cols-[30px_1fr_1fr_40px] gap-3 items-center`}
-                            >
-                                <span className="text-secondary font-bold text-center bg-surfaceHighlight rounded-md py-2">{setIdx + 1}</span>
-                                <input 
-                                    type="text" 
-                                    value={set.weight}
-                                    onChange={(e) => handleSetChange(exIdx, setIdx, 'weight', e.target.value)}
-                                    className="bg-surface border border-border rounded-xl text-center py-2.5 text-white font-bold outline-none focus:border-white focus:bg-surfaceHighlight transition-colors"
-                                    inputMode="decimal"
-                                />
-                                <input 
-                                    type="text" 
-                                    value={set.reps}
-                                    onChange={(e) => handleSetChange(exIdx, setIdx, 'reps', e.target.value)}
-                                    className="bg-surface border border-border rounded-xl text-center py-2.5 text-white font-bold outline-none focus:border-white focus:bg-surfaceHighlight transition-colors"
-                                    inputMode="numeric"
-                                />
-                                <button 
-                                    onClick={() => handleToggleSet(exIdx, setIdx)}
-                                    className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-accentGreen text-white' : 'bg-surfaceHighlight text-secondary hover:bg-surfaceHighlight/80'}`}
-                                >
-                                    <CheckCircle2 size={20} />
-                                </button>
-                            </div>
-                        ))}
-
-                        <div className="flex justify-end gap-3 mt-2">
-                            <button 
-                                onClick={() => handleRemoveSet(exIdx)}
-                                className="text-xs font-bold text-red-400 bg-red-400/10 px-4 py-3 rounded-lg hover:bg-red-400/20 transition disabled:opacity-50 flex items-center gap-1"
-                                disabled={(exercise.sets || []).length <= 1}
-                            >
-                                <Minus size={14} /> Remove Set
-                            </button>
-                            <button 
-                                onClick={() => handleAddSet(exIdx)}
-                                className="text-xs font-bold text-white bg-surfaceHighlight border border-white/10 px-4 py-3 rounded-lg hover:bg-white/10 transition flex items-center gap-1"
-                            >
-                                <Plus size={14} /> Add Set
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
+        <ActiveWorkoutScreen 
+            initialSession={activeSession} 
+            exerciseHistory={exerciseHistory}
+            onFinish={handleSessionFinished}
+        />
     );
   }
 
