@@ -215,8 +215,9 @@ export interface FoodLogEntry {
   protein: number;
   carbs?: number;     // Optional for backward compatibility
   fats?: number;      // Optional for backward compatibility
-  source?: 'MANUAL' | 'RECIPE';
+  source?: 'MANUAL' | 'RECIPE' | 'DATABASE';
   recipeId?: string;
+  fdcId?: number;     // USDA FoodData Central ID
 }
 
 export interface MacroTargets {
@@ -224,4 +225,16 @@ export interface MacroTargets {
   protein: number;
   carbs: number;
   fats: number;
+}
+
+export interface SearchableFoodItem {
+  id: number;         // FDC ID
+  name: string;
+  calories: number;   // kcal
+  protein: number;    // g
+  carbs: number;      // g
+  fats: number;       // g
+  brand?: string;
+  servingSize?: number;
+  servingUnit?: string;
 }

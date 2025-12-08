@@ -1,11 +1,13 @@
 
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { Recipe, FoodLogEntry, MealType, MacroTargets } from '../types';
 import { generateAIRecipe, RecipePreferences } from '../services/geminiService';
-import { Zap, Clock, ChevronRight, PlusCircle, ArrowLeft, Droplets, Check, ChefHat, X, Plus, Sparkles, Flame, Coffee, Utensils, Moon, Edit2 } from 'lucide-react';
+import { Zap, Clock, ChevronRight, PlusCircle, ArrowLeft, Droplets, Check, ChefHat, X, Plus, Sparkles, Flame, Coffee, Utensils, Moon, Edit2, Search } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, ReferenceLine, Cell } from 'recharts';
+import { FoodSearchScreen } from './FoodSearchScreen';
 
 interface FoodViewProps {
   recipes: Recipe[];
@@ -13,7 +15,7 @@ interface FoodViewProps {
   waterConsumed: number;
   onUpdateWater: (amount: number) => void;
   foodLog: FoodLogEntry[];
-  onQuickLog: (cals: number, protein: number, carbs: number, fats: number, name: string, mealType: MealType) => void;
+  onQuickLog: (cals: number, protein: number, carbs: number, fats: number, name: string, mealType: MealType, fdcId?: number) => void;
   onLogRecipeToToday: (recipe: Recipe, mealType: MealType) => void;
   macroTargets: MacroTargets;
   onUpdateTargets: (targets: MacroTargets) => void;
@@ -34,6 +36,7 @@ export const FoodView: React.FC<FoodViewProps> = ({
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [showEditTargets, setShowEditTargets] = useState(false);
+  const [showSearchScreen, setShowSearchScreen] = useState(false);
   
   // Wizard State
   const [showWizard, setShowWizard] = useState(false);
@@ -136,6 +139,17 @@ export const FoodView: React.FC<FoodViewProps> = ({
       if(showEditTargets) setEditTargets(macroTargets);
   }, [showEditTargets, macroTargets]);
 
+  // --- SUB-VIEW: SEARCH SCREEN ---
+  if (showSearchScreen) {
+      return (
+          <FoodSearchScreen 
+            onBack={() => setShowSearchScreen(false)}
+            onLogFood={(name, cals, prot, carbs, fats, mealType, fdcId) => {
+                onQuickLog(cals, prot, carbs, fats, name, mealType, fdcId);
+            }}
+          />
+      );
+  }
 
   // --- SUB-VIEW: RECIPE DETAIL ---
   if (selectedRecipe) {
@@ -338,11 +352,17 @@ export const FoodView: React.FC<FoodViewProps> = ({
          </div>
       </GlassCard>
 
-      {/* Quick Actions */}
-      <button onClick={() => setShowQuickLog(true)} className="w-full py-4 rounded-[20px] bg-surface border border-border flex items-center justify-center space-x-2 text-white font-medium hover:bg-surfaceHighlight transition active:scale-[0.99]">
-            <PlusCircle size={18} />
-            <span>Quick Log Food</span>
-      </button>
+      {/* Primary Log Action */}
+      <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => setShowSearchScreen(true)} className="py-4 rounded-[20px] bg-white text-black font-bold flex flex-col items-center justify-center hover:bg-gray-200 transition shadow-lg shadow-white/10 active:scale-[0.98]">
+               <Search size={24} className="mb-1" />
+               <span className="text-xs">Search Database</span>
+          </button>
+          <button onClick={() => setShowQuickLog(true)} className="py-4 rounded-[20px] bg-surfaceHighlight border border-border text-white font-medium flex flex-col items-center justify-center hover:bg-white/5 transition active:scale-[0.98]">
+               <Zap size={24} className="mb-1 text-secondary" />
+               <span className="text-xs">Manual Entry</span>
+          </button>
+      </div>
 
       {/* TODAY'S MEALS LOG */}
       <div className="space-y-4">
