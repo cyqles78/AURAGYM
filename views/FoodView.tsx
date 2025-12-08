@@ -1,13 +1,14 @@
 
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlassCard } from '../components/GlassCard';
-import { Recipe, FoodLogEntry, MealType, MacroTargets } from '../types';
+import { Recipe, FoodLogEntry, MealType, MacroTargets, WeeklyMealPlan } from '../types';
 import { generateAIRecipe, RecipePreferences } from '../services/geminiService';
-import { Zap, Clock, ChevronRight, PlusCircle, ArrowLeft, Droplets, Check, ChefHat, X, Plus, Sparkles, Flame, Coffee, Utensils, Moon, Edit2, Search } from 'lucide-react';
+import { Zap, Clock, ChevronRight, PlusCircle, ArrowLeft, Droplets, Check, ChefHat, X, Plus, Sparkles, Flame, Coffee, Utensils, Moon, Edit2, Search, Calendar } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, ReferenceLine, Cell } from 'recharts';
 import { FoodSearchScreen } from './FoodSearchScreen';
+import { MealPlanGeneratorScreen } from './MealPlanGeneratorScreen';
+import { MealPlanDisplayScreen } from './MealPlanDisplayScreen';
 
 interface FoodViewProps {
   recipes: Recipe[];
@@ -37,6 +38,10 @@ export const FoodView: React.FC<FoodViewProps> = ({
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [showEditTargets, setShowEditTargets] = useState(false);
   const [showSearchScreen, setShowSearchScreen] = useState(false);
+  
+  // Weekly Meal Plan State
+  const [showPlanGenerator, setShowPlanGenerator] = useState(false);
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyMealPlan | null>(null);
   
   // Wizard State
   const [showWizard, setShowWizard] = useState(false);
@@ -151,6 +156,30 @@ export const FoodView: React.FC<FoodViewProps> = ({
       );
   }
 
+  // --- SUB-VIEW: MEAL PLAN GENERATOR ---
+  if (showPlanGenerator) {
+      return (
+          <MealPlanGeneratorScreen 
+            onBack={() => setShowPlanGenerator(false)}
+            onPlanGenerated={(plan) => {
+                setWeeklyPlan(plan);
+                setShowPlanGenerator(false); // Switch to display
+            }}
+            initialTargets={{ calories: macroTargets.calories, protein: macroTargets.protein }}
+          />
+      );
+  }
+
+  // --- SUB-VIEW: MEAL PLAN DISPLAY ---
+  if (weeklyPlan) {
+      return (
+          <MealPlanDisplayScreen 
+             plan={weeklyPlan}
+             onBack={() => setWeeklyPlan(null)}
+          />
+      );
+  }
+
   // --- SUB-VIEW: RECIPE DETAIL ---
   if (selectedRecipe) {
       return (
@@ -260,14 +289,23 @@ export const FoodView: React.FC<FoodViewProps> = ({
     <div className="pb-28 pt-6 space-y-6">
       <div className="flex justify-between items-center px-1">
         <h1 className="text-3xl font-bold text-white tracking-tight">Nutrition</h1>
-        <button 
-          onClick={() => setShowWizard(true)}
-          disabled={loading}
-          className="flex items-center space-x-1 text-xs font-bold text-black bg-white px-4 py-2 rounded-full hover:bg-gray-200 transition-colors"
-        >
-          {loading ? <span className="animate-spin mr-1">●</span> : <Sparkles size={14} className="mr-1 fill-black" />}
-          AI Chef
-        </button>
+        <div className="flex gap-2">
+            <button 
+                onClick={() => setShowPlanGenerator(true)}
+                className="flex items-center space-x-1 text-xs font-bold text-white border border-white/20 bg-white/5 px-3 py-2 rounded-full hover:bg-white/10 transition-colors"
+            >
+                <Calendar size={14} className="mr-1" />
+                Plan Week
+            </button>
+            <button 
+                onClick={() => setShowWizard(true)}
+                disabled={loading}
+                className="flex items-center space-x-1 text-xs font-bold text-black bg-white px-3 py-2 rounded-full hover:bg-gray-200 transition-colors"
+            >
+                {loading ? <span className="animate-spin mr-1">●</span> : <Sparkles size={14} className="mr-1 fill-black" />}
+                AI Chef
+            </button>
+        </div>
       </div>
 
       {/* TODAY'S MACROS & WATER */}

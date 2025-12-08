@@ -253,3 +253,31 @@ export interface MetricSummary {
   percentageChange: number;
   allTimeHigh: number;
 }
+
+// --- AI MEAL PLANNING ---
+
+export interface RecipeSummary {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
+
+export interface MealEntry {
+  mealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+  recipeName: string;
+  recipeDetails: RecipeSummary;
+  preparationTimeMinutes: number;
+  ingredients?: string[];
+}
+
+export interface DayPlan {
+  dayName: string;
+  meals: MealEntry[];
+}
+
+export interface WeeklyMealPlan {
+  planId: string;
+  dateGenerated: string;
+  days: DayPlan[];
+}

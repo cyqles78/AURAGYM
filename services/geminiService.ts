@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { WorkoutPlan, Recipe, Program, ProgramDayProgressRequest, ProgramDayProgressResult } from "../types";
+import { WorkoutPlan, Recipe, Program, ProgramDayProgressRequest, ProgramDayProgressResult, WeeklyMealPlan } from "../types";
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -463,6 +462,122 @@ export const generateProgressedProgramDay = async (req: ProgramDayProgressReques
 
   } catch (error) {
     console.error("Error generating progression:", error);
+    return null;
+  }
+};
+
+// --- MEAL PLAN GENERATION ---
+
+export interface MealPlanInput {
+  calories: number;
+  protein: number;
+  restrictions: string;
+}
+
+export const generateMealPlan = async (goals: MealPlanInput): Promise<WeeklyMealPlan | null> => {
+  if (!apiKey) return null;
+
+  const model = "gemini-2.5-flash";
+  const prompt = `Act as an expert nutritionist and chef. Create a complete 7-DAY MEAL PLAN based on the following requirements:
+  
+  Target Daily Metrics:
+  - Calories: ~${goals.calories} kcal
+  - Protein: ~${goals.protein}g
+  
+  Dietary Restrictions / Preferences:
+  ${goals.restrictions || "None (Standard balanced diet)"}
+  
+  Requirements:
+  1. Generate exactly 7 days (Day 1 to Day 7).
+  2. Each day must have 3-5 meal entries (Breakfast, Lunch, Dinner, Snack).
+  3. Use common, healthy, easy-to-prepare ingredients suitable for a gym-goer.
+  4. CRITICAL: List ONLY the top 5 main ingredients per meal to keep the response concise and prevent data truncation.
+  5. Provide estimated macros for each meal.
+  
+  Return a strictly valid JSON object matching this structure:
+  {
+    "planId": "string",
+    "dateGenerated": "string",
+    "days": [
+      {
+        "dayName": "string",
+        "meals": [
+          {
+            "mealType": "Breakfast" | "Lunch" | "Dinner" | "Snack",
+            "recipeName": "string",
+            "preparationTimeMinutes": number,
+            "recipeDetails": {
+               "calories": number,
+               "protein": number,
+               "carbs": number,
+               "fats": number
+            },
+            "ingredients": ["string"]
+          }
+        ]
+      }
+    ]
+  }`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            planId: { type: Type.STRING },
+            dateGenerated: { type: Type.STRING },
+            days: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  dayName: { type: Type.STRING },
+                  meals: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        mealType: { type: Type.STRING, enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'] },
+                        recipeName: { type: Type.STRING },
+                        preparationTimeMinutes: { type: Type.INTEGER },
+                        recipeDetails: {
+                          type: Type.OBJECT,
+                          properties: {
+                            calories: { type: Type.INTEGER },
+                            protein: { type: Type.INTEGER },
+                            carbs: { type: Type.INTEGER },
+                            fats: { type: Type.INTEGER }
+                          }
+                        },
+                        ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) return null;
+
+    console.log("[AI Meal Plan raw JSON]", text);
+    const plan = JSON.parse(text) as WeeklyMealPlan;
+    
+    // Ensure IDs and dates
+    if (!plan.planId) plan.planId = Date.now().toString();
+    if (!plan.dateGenerated) plan.dateGenerated = new Date().toISOString();
+
+    return plan;
+  } catch (error) {
+    console.error("Error generating meal plan:", error);
     return null;
   }
 };
