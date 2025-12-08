@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { Recipe, FoodLogEntry, MealType, MacroTargets, WeeklyMealPlan } from '../types';
@@ -9,6 +7,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, ReferenceLine, Cell
 import { FoodSearchScreen } from './FoodSearchScreen';
 import { MealPlanGeneratorScreen } from './MealPlanGeneratorScreen';
 import { MealPlanDisplayScreen } from './MealPlanDisplayScreen';
+import { ShoppingListScreen } from './ShoppingListScreen';
 
 interface FoodViewProps {
   recipes: Recipe[];
@@ -42,6 +41,7 @@ export const FoodView: React.FC<FoodViewProps> = ({
   // Weekly Meal Plan State
   const [showPlanGenerator, setShowPlanGenerator] = useState(false);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyMealPlan | null>(null);
+  const [showShoppingList, setShowShoppingList] = useState(false);
   
   // Wizard State
   const [showWizard, setShowWizard] = useState(false);
@@ -170,12 +170,33 @@ export const FoodView: React.FC<FoodViewProps> = ({
       );
   }
 
+  // --- SUB-VIEW: SHOPPING LIST ---
+  if (showShoppingList && weeklyPlan) {
+      return (
+          <ShoppingListScreen 
+             plan={weeklyPlan}
+             onBack={() => setShowShoppingList(false)}
+          />
+      );
+  }
+
   // --- SUB-VIEW: MEAL PLAN DISPLAY ---
   if (weeklyPlan) {
       return (
           <MealPlanDisplayScreen 
              plan={weeklyPlan}
              onBack={() => setWeeklyPlan(null)}
+             onViewShoppingList={() => setShowShoppingList(true)}
+             onLogMeal={(meal) => {
+                onQuickLog(
+                    meal.recipeDetails.calories,
+                    meal.recipeDetails.protein,
+                    meal.recipeDetails.carbs,
+                    meal.recipeDetails.fats,
+                    meal.recipeName,
+                    meal.mealType as MealType
+                );
+             }}
           />
       );
   }

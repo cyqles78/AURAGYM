@@ -478,21 +478,19 @@ export const generateMealPlan = async (goals: MealPlanInput): Promise<WeeklyMeal
   if (!apiKey) return null;
 
   const model = "gemini-2.5-flash";
-  const prompt = `Act as an expert nutritionist and chef. Create a complete 7-DAY MEAL PLAN based on the following requirements:
+  // We request only 3 days to safely stay within token limits of the model
+  // We will programmatically cycle Day 1-3 to fill the week to 7 days.
+  const prompt = `Act as an expert nutritionist and chef. Create a MEAL PLAN for 3 DAYS based on the following:
   
-  Target Daily Metrics:
-  - Calories: ~${goals.calories} kcal
-  - Protein: ~${goals.protein}g
+  Target: ~${goals.calories} kcal, ~${goals.protein}g protein/day.
+  Restrictions: ${goals.restrictions || "None"}.
   
-  Dietary Restrictions / Preferences:
-  ${goals.restrictions || "None (Standard balanced diet)"}
-  
-  Requirements:
-  1. Generate exactly 7 days (Day 1 to Day 7).
-  2. Each day must have 3-5 meal entries (Breakfast, Lunch, Dinner, Snack).
-  3. Use common, healthy, easy-to-prepare ingredients suitable for a gym-goer.
-  4. CRITICAL: List ONLY the top 5 main ingredients per meal to keep the response concise and prevent data truncation.
-  5. Provide estimated macros for each meal.
+  REQUIREMENTS:
+  1. Generate exactly 3 distinct days.
+  2. Each day must have 3-4 meal entries (Breakfast, Lunch, Dinner, Snack).
+  3. Use common, healthy ingredients.
+  4. CRITICAL: List ONLY the top 5 main ingredients per meal. Strings must be formatted as "Quantity Unit Ingredient" (e.g. "200g Chicken Breast", "2 slices Bread", "1 Cup Rice").
+  5. JSON ONLY response.
   
   Return a strictly valid JSON object matching this structure:
   {
@@ -574,6 +572,19 @@ export const generateMealPlan = async (goals: MealPlanInput): Promise<WeeklyMeal
     // Ensure IDs and dates
     if (!plan.planId) plan.planId = Date.now().toString();
     if (!plan.dateGenerated) plan.dateGenerated = new Date().toISOString();
+
+    // Fill up to 7 days if AI only returned 3 to save tokens
+    if (plan.days.length < 7 && plan.days.length > 0) {
+        const originalLength = plan.days.length;
+        let i = 0;
+        while (plan.days.length < 7) {
+            const dayToCopy = plan.days[i % originalLength];
+            const newDay = JSON.parse(JSON.stringify(dayToCopy)); // Deep copy
+            newDay.dayName = `Day ${plan.days.length + 1}`;
+            plan.days.push(newDay);
+            i++;
+        }
+    }
 
     return plan;
   } catch (error) {

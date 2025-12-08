@@ -10,50 +10,83 @@ interface UseActiveWorkoutProps {
 
 export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }: UseActiveWorkoutProps) => {
   const [session, setSession] = useState<WorkoutSession>(initialSession);
+  
+  // Timing State (Timestamp based for accuracy)
+  const [startTime] = useState<number>(initialSession.startTime || Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isSessionRunning, setIsSessionRunning] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const [pauseStartTime, setPauseStartTime] = useState<number | null>(null);
+  const [totalPausedTime, setTotalPausedTime] = useState(0); // in milliseconds
 
   // Rest Timer State
   const [restSeconds, setRestSeconds] = useState(0);
   const [isResting, setIsResting] = useState(false);
-  const [restDuration, setRestDuration] = useState(60); // Default 60s
+  const [restDuration, setRestDuration] = useState(60); 
 
-  // Session Timer
+  // --- TIMER LOGIC ---
   useEffect(() => {
     let interval: any;
-    if (isSessionRunning) {
-      interval = setInterval(() => setElapsedSeconds(t => t + 1), 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isSessionRunning]);
 
-  // Rest Timer
+    if (!isPaused) {
+      interval = setInterval(() => {
+        const now = Date.now();
+        // Calculate active duration: Total elapsed wall time minus accumulated pause time
+        // Note: We don't subtract the *current* pending pause time here, only finalized pauses.
+        // If we want elapsedSeconds to freeze visually during pause, we do that in the render logic or here.
+        // But since we stop the interval when paused, this calculation runs only when active.
+        const currentTotalElapsed = now - startTime;
+        const netElapsed = currentTotalElapsed - totalPausedTime;
+        setElapsedSeconds(Math.floor(netElapsed / 1000));
+      }, 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, [isPaused, startTime, totalPausedTime]);
+
+  // --- PAUSE / RESUME ---
+  const togglePause = () => {
+    if (isPaused) {
+      // Resume
+      if (pauseStartTime) {
+        const pauseDuration = Date.now() - pauseStartTime;
+        setTotalPausedTime(prev => prev + pauseDuration);
+      }
+      setPauseStartTime(null);
+      setIsPaused(false);
+    } else {
+      // Pause
+      setPauseStartTime(Date.now());
+      setIsPaused(true);
+    }
+  };
+
+  // --- REST TIMER ---
   useEffect(() => {
     let interval: any;
     if (isResting && restSeconds > 0) {
       interval = setInterval(() => setRestSeconds(t => t - 1), 1000);
     } else if (isResting && restSeconds === 0) {
-      // Timer finished
       setIsResting(false);
-      // Simple vibration if supported
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([200, 100, 200]);
       }
-      // Optional: Play sound logic here
     }
     return () => clearInterval(interval);
   }, [isResting, restSeconds]);
 
+  // --- EXERCISE & SET MANAGEMENT ---
+
   const toggleSetComplete = (exerciseIndex: number, setIndex: number) => {
+    if (isPaused) return; // Prevent interaction when paused
+
     const updatedExercises = [...session.exercises];
     const targetSet = updatedExercises[exerciseIndex].sets[setIndex];
     const wasCompleted = targetSet.completed;
     
-    // Toggle state
     targetSet.completed = !wasCompleted;
     setSession({ ...session, exercises: updatedExercises });
 
-    // Logic: If we just marked it as complete, start rest timer
+    // Start rest if marking as complete
     if (!wasCompleted) {
       const exerciseRestTime = updatedExercises[exerciseIndex].restTimeSeconds || 60;
       startRest(exerciseRestTime);
@@ -61,6 +94,8 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
   };
 
   const updateSetField = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
+    if (isPaused) return;
+
     const updatedExercises = session.exercises.map((ex, exIdx) => {
       if (exIdx !== exerciseIndex) return ex;
       return {
@@ -74,13 +109,13 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
   };
 
   const addSet = (exerciseIndex: number) => {
+    if (isPaused) return;
+
     const updatedExercises = [...session.exercises];
     const exercise = updatedExercises[exerciseIndex];
     
-    // AI SUGGESTION LOGIC
-    // 1. Check current session's previous set
+    // Suggest values based on previous set or history
     const previousSetInSession = exercise.sets[exercise.sets.length - 1];
-    
     let suggestedReps = '8';
     let suggestedWeight = '0';
 
@@ -88,13 +123,11 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
       suggestedReps = previousSetInSession.reps;
       suggestedWeight = previousSetInSession.weight;
     } else {
-      // 2. Check History if this is the first set
       const historyEntry = exerciseHistory
         .filter(h => h.exerciseName === exercise.name)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
       if (historyEntry && historyEntry.sets.length > 0) {
-        // Use the last set of the last workout
         const lastSet = historyEntry.sets[historyEntry.sets.length - 1];
         suggestedReps = lastSet.reps.toString();
         suggestedWeight = (lastSet.weight || 0).toString();
@@ -113,12 +146,36 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
   };
 
   const removeSet = (exerciseIndex: number) => {
+    if (isPaused) return;
     const updatedExercises = [...session.exercises];
     if (updatedExercises[exerciseIndex].sets.length > 1) {
       updatedExercises[exerciseIndex].sets.pop();
       setSession({ ...session, exercises: updatedExercises });
     }
   };
+
+  // New Function: Delete specific set by ID
+  const deleteSet = (setId: string) => {
+    if (isPaused) return;
+
+    const updatedExercises = session.exercises.map(ex => ({
+      ...ex,
+      sets: ex.sets.filter(s => s.id !== setId)
+    }));
+    
+    setSession({ ...session, exercises: updatedExercises });
+  };
+
+  // New Function: Skip entire exercise
+  const skipExercise = (exerciseId: string) => {
+    if (isPaused) return;
+    
+    // Filter out the exercise
+    const updatedExercises = session.exercises.filter(ex => ex.id !== exerciseId);
+    setSession({ ...session, exercises: updatedExercises });
+  };
+
+  // --- REST CONTROLS ---
 
   const startRest = (duration: number) => {
     setRestDuration(duration);
@@ -135,21 +192,42 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
     setRestSeconds(prev => prev + seconds);
   };
 
+  // --- FINISH ---
+
   const finishSession = () => {
-    setIsSessionRunning(false);
-    onComplete({ ...session, endTime: Date.now() });
+    // If paused, ensure we calculate final duration correctly
+    let finalTotalPaused = totalPausedTime;
+    if (isPaused && pauseStartTime) {
+      finalTotalPaused += (Date.now() - pauseStartTime);
+    }
+
+    const now = Date.now();
+    const finalActiveDurationSeconds = Math.floor((now - startTime - finalTotalPaused) / 1000);
+
+    onComplete({ 
+      ...session, 
+      endTime: now,
+      activeDuration: finalActiveDurationSeconds
+    });
   };
 
   return {
     session,
     elapsedSeconds,
+    isPaused,
+    
     restSeconds,
     isResting,
     restDuration,
+    
+    togglePause,
     toggleSetComplete,
     updateSetField,
     addSet,
     removeSet,
+    deleteSet,
+    skipExercise,
+    
     skipRest,
     addRestTime,
     finishSession

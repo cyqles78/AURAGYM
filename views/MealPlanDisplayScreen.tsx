@@ -1,16 +1,21 @@
-
-
 import React, { useState } from 'react';
-import { ArrowLeft, Clock, Flame, Droplets, Calendar, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Clock, Flame, Droplets, Calendar, ChevronRight, ShoppingCart, Check, Plus } from 'lucide-react';
 import { WeeklyMealPlan, MealEntry } from '../types';
 import { GlassCard } from '../components/GlassCard';
 
 interface MealPlanDisplayScreenProps {
   plan: WeeklyMealPlan;
   onBack: () => void;
+  onLogMeal: (meal: MealEntry) => void;
+  onViewShoppingList: () => void;
 }
 
-export const MealPlanDisplayScreen: React.FC<MealPlanDisplayScreenProps> = ({ plan, onBack }) => {
+export const MealPlanDisplayScreen: React.FC<MealPlanDisplayScreenProps> = ({ 
+  plan, 
+  onBack,
+  onLogMeal,
+  onViewShoppingList
+}) => {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   const currentDay = plan.days[selectedDayIndex];
@@ -26,14 +31,22 @@ export const MealPlanDisplayScreen: React.FC<MealPlanDisplayScreenProps> = ({ pl
   return (
     <div className="pb-28 pt-6 space-y-6 animate-in slide-in-from-right">
       {/* Header */}
-      <div className="flex items-center space-x-2 px-1">
-          <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-white/10 text-white">
-              <ArrowLeft size={20} />
-          </button>
-          <div className="flex-1">
-             <h1 className="text-xl font-bold text-white">Weekly Plan</h1>
-             <p className="text-xs text-secondary">Generated {new Date(plan.dateGenerated).toLocaleDateString()}</p>
+      <div className="flex items-center justify-between px-1">
+          <div className="flex items-center space-x-2">
+              <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-white/10 text-white">
+                  <ArrowLeft size={20} />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold text-white">Weekly Plan</h1>
+                <p className="text-xs text-secondary">Generated {new Date(plan.dateGenerated).toLocaleDateString()}</p>
+              </div>
           </div>
+          <button 
+            onClick={onViewShoppingList}
+            className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-xs font-bold hover:bg-gray-200 transition"
+          >
+              <ShoppingCart size={14} /> Shopping List
+          </button>
       </div>
 
       {/* Day Selector */}
@@ -79,16 +92,29 @@ export const MealPlanDisplayScreen: React.FC<MealPlanDisplayScreenProps> = ({ pl
           </h2>
           
           {currentDay.meals.map((meal, idx) => (
-              <MealCard key={idx} meal={meal} />
+              <MealCard 
+                key={idx} 
+                meal={meal} 
+                onLog={() => onLogMeal(meal)}
+              />
           ))}
       </div>
     </div>
   );
 };
 
-const MealCard: React.FC<{ meal: MealEntry }> = ({ meal }) => {
+const MealCard: React.FC<{ meal: MealEntry; onLog: () => void }> = ({ meal, onLog }) => {
+    const [logged, setLogged] = useState(false);
+
+    const handleLog = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onLog();
+        setLogged(true);
+        setTimeout(() => setLogged(false), 2000);
+    };
+
     return (
-        <GlassCard className="flex flex-col gap-3 group">
+        <GlassCard className="flex flex-col gap-3 group relative overflow-hidden">
             <div className="flex justify-between items-start">
                 <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-accentBlue bg-accentBlue/10 px-2 py-1 rounded-md mb-2 inline-block">
@@ -116,6 +142,25 @@ const MealCard: React.FC<{ meal: MealEntry }> = ({ meal }) => {
                     {meal.ingredients.join(", ")}
                 </div>
             )}
+
+            {/* Quick Log Action */}
+            <div className="mt-3">
+                <button 
+                    onClick={handleLog}
+                    disabled={logged}
+                    className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                        logged 
+                        ? 'bg-accentGreen text-black' 
+                        : 'bg-surfaceHighlight border border-white/10 text-white hover:bg-white/10'
+                    }`}
+                >
+                    {logged ? (
+                        <><Check size={14} /> Logged</>
+                    ) : (
+                        <><Plus size={14} /> Log Meal</>
+                    )}
+                </button>
+            </div>
         </GlassCard>
     );
 };

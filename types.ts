@@ -1,5 +1,4 @@
 
-
 export interface Exercise {
   id: string;
   name: string;
@@ -92,6 +91,7 @@ export interface WorkoutSession {
   programDayId?: string; // For programs
   startTime: number;
   endTime?: number;
+  activeDuration?: number; // Net duration in seconds (excluding pauses)
   exercises: Exercise[]; // Copies of exercises with user-inputted data
   status: 'active' | 'completed';
 }
@@ -280,4 +280,11 @@ export interface WeeklyMealPlan {
   planId: string;
   dateGenerated: string;
   days: DayPlan[];
+}
+
+export interface ShoppingListItem {
+  ingredient: string;
+  quantity: number;
+  unit: string;
+  isChecked: boolean;
 }

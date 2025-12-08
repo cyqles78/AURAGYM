@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, ArrowLeft, Loader2, Plus, AlertCircle } from 'lucide-react';
-import { searchFoodDatabase } from '../services/nutritionService';
+import { Search, ArrowLeft, Loader2, Plus, AlertCircle, ScanBarcode } from 'lucide-react';
+import { searchFoodDatabase, searchFoodByUPC } from '../services/nutritionService';
 import { SearchableFoodItem, MealType } from '../types';
 import { LogFoodModal } from '../components/LogFoodModal';
 import { GlassCard } from '../components/GlassCard';
+import { BarcodeScannerScreen } from './BarcodeScannerScreen';
 
 interface FoodSearchScreenProps {
   onBack: () => void;
@@ -17,6 +18,7 @@ export const FoodSearchScreen: React.FC<FoodSearchScreenProps> = ({ onBack, onLo
   const [loading, setLoading] = useState(false);
   const [selectedFood, setSelectedFood] = useState<SearchableFoodItem | null>(null);
   const [error, setError] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
 
   // Debounce logic
   useEffect(() => {
@@ -41,16 +43,54 @@ export const FoodSearchScreen: React.FC<FoodSearchScreenProps> = ({ onBack, onLo
     return () => clearTimeout(timer);
   }, [query]);
 
+  const handleBarcodeScan = async (upc: string) => {
+      setShowScanner(false);
+      setLoading(true);
+      setError('');
+      setQuery(upc); // Show the UPC in search bar for context
+
+      try {
+          const food = await searchFoodByUPC(upc);
+          if (food) {
+              setSelectedFood(food);
+          } else {
+              setError(`Product not found (UPC: ${upc})`);
+          }
+      } catch (err) {
+          setError('Failed to lookup barcode');
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  if (showScanner) {
+      return (
+          <BarcodeScannerScreen 
+            onClose={() => setShowScanner(false)}
+            onScan={handleBarcodeScan}
+          />
+      );
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col animate-in slide-in-from-bottom duration-300">
       
       {/* Header & Search Bar */}
       <div className="bg-[#1C1C1E] p-4 pb-6 border-b border-[#2C2C2E] sticky top-0 z-10">
-         <div className="flex items-center gap-3 mb-4">
-             <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-white/10 text-white">
-                 <ArrowLeft size={20} />
+         <div className="flex items-center justify-between mb-4">
+             <div className="flex items-center gap-3">
+                 <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-white/10 text-white">
+                     <ArrowLeft size={20} />
+                 </button>
+                 <h2 className="text-lg font-bold text-white">Log Food</h2>
+             </div>
+             
+             <button 
+                onClick={() => setShowScanner(true)}
+                className="flex items-center gap-2 bg-surfaceHighlight border border-white/10 px-3 py-1.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition"
+             >
+                 <ScanBarcode size={16} /> Scan
              </button>
-             <h2 className="text-lg font-bold text-white">Log Food</h2>
          </div>
          
          <div className="relative">
@@ -59,7 +99,7 @@ export const FoodSearchScreen: React.FC<FoodSearchScreenProps> = ({ onBack, onLo
                 type="text" 
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search food (e.g. Avocado, Chicken)..."
+                placeholder="Search food (e.g. Avocado)..."
                 className="w-full bg-[#2C2C2E] text-white pl-11 pr-4 py-3.5 rounded-2xl outline-none focus:ring-1 focus:ring-white font-medium"
                 autoFocus
              />
@@ -74,8 +114,15 @@ export const FoodSearchScreen: React.FC<FoodSearchScreenProps> = ({ onBack, onLo
       {/* Results List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {query.length < 2 && !loading && (
-              <div className="text-center py-10 text-[#8E8E93]">
-                  <p>Type at least 2 characters to search</p>
+              <div className="text-center py-10 text-[#8E8E93] flex flex-col items-center gap-4">
+                  <p>Type to search or scan a barcode</p>
+                  <button 
+                    onClick={() => setShowScanner(true)}
+                    className="flex flex-col items-center justify-center p-6 bg-[#1C1C1E] border border-dashed border-[#2C2C2E] rounded-2xl w-full hover:bg-[#2C2C2E] transition"
+                  >
+                      <ScanBarcode size={32} className="text-accent mb-2" />
+                      <span className="text-sm font-bold text-white">Scan Barcode</span>
+                  </button>
               </div>
           )}
 
