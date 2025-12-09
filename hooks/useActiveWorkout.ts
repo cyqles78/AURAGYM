@@ -23,6 +23,9 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
   const [isResting, setIsResting] = useState(false);
   const [restDuration, setRestDuration] = useState(60); 
 
+  // Auto-scroll/Focus State
+  const [activeSetFocus, setActiveSetFocus] = useState<{ exerciseIndex: number, setIndex: number } | null>(null);
+
   // --- TIMER LOGIC ---
   useEffect(() => {
     let interval: any;
@@ -78,16 +81,62 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
     if (isPaused) return; // Prevent interaction when paused
 
     const updatedExercises = [...session.exercises];
-    const targetSet = updatedExercises[exerciseIndex].sets[setIndex];
+    const currentExercise = updatedExercises[exerciseIndex];
+    const targetSet = currentExercise.sets[setIndex];
     const wasCompleted = targetSet.completed;
     
     targetSet.completed = !wasCompleted;
     setSession({ ...session, exercises: updatedExercises });
 
-    // Start rest if marking as complete
+    // Handle Logic when MARKING AS COMPLETE
     if (!wasCompleted) {
-      const exerciseRestTime = updatedExercises[exerciseIndex].restTimeSeconds || 60;
-      startRest(exerciseRestTime);
+      const exerciseRestTime = currentExercise.restTimeSeconds || 60;
+      
+      // SUPERSET LOGIC
+      if (currentExercise.supersetId) {
+        // Find all exercises in this superset
+        const supersetGroupIndices = updatedExercises
+          .map((ex, idx) => ({ ...ex, idx }))
+          .filter(ex => ex.supersetId === currentExercise.supersetId)
+          .map(ex => ex.idx);
+        
+        const positionInGroup = supersetGroupIndices.indexOf(exerciseIndex);
+        const isLastInSuperset = positionInGroup === supersetGroupIndices.length - 1;
+
+        if (!isLastInSuperset) {
+          // NOT the last exercise in superset -> Move to next exercise, SAME set index (if exists)
+          const nextExerciseIndex = supersetGroupIndices[positionInGroup + 1];
+          const nextExercise = updatedExercises[nextExerciseIndex];
+          
+          // Check if next exercise has this set
+          if (nextExercise.sets[setIndex]) {
+             // Transition immediately (Superset flow)
+             setActiveSetFocus({ exerciseIndex: nextExerciseIndex, setIndex: setIndex });
+             // Optional: Short transition timer? For now, instant.
+             return; 
+          }
+        } else {
+          // IS the last exercise -> Start Rest -> Loop back to first exercise, NEXT set
+          startRest(exerciseRestTime);
+          const firstExerciseIndex = supersetGroupIndices[0];
+          const firstExercise = updatedExercises[firstExerciseIndex];
+          
+          if (firstExercise.sets[setIndex + 1]) {
+             setActiveSetFocus({ exerciseIndex: firstExerciseIndex, setIndex: setIndex + 1 });
+          }
+          return;
+        }
+      } 
+      
+      // STANDARD STRAIGHT SET LOGIC
+      // If next set exists in same exercise
+      if (currentExercise.sets[setIndex + 1]) {
+          startRest(exerciseRestTime);
+          setActiveSetFocus({ exerciseIndex, setIndex: setIndex + 1 });
+      } else {
+          // Exercise complete
+          startRest(exerciseRestTime);
+      }
     }
   };
 
@@ -266,6 +315,7 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
     restSeconds,
     isResting,
     restDuration,
+    activeSetFocus, // Expose focus state
     
     togglePause,
     toggleSetComplete,

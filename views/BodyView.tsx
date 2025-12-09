@@ -1,8 +1,11 @@
+
 import React, { useState, useMemo } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { WeightEntry, MeasurementEntry, WeightGoal, ExercisePerformanceEntry } from '../types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, LineChart, Line } from 'recharts';
-import { Camera, Ruler, TrendingUp, TrendingDown, Plus, X, Target, Edit2, Trophy, Dumbbell } from 'lucide-react';
+import { Camera, Ruler, TrendingUp, TrendingDown, Plus, X, Target, Edit2, Trophy, Dumbbell, Activity, Battery } from 'lucide-react';
+import { useRecoveryStatus } from '../hooks/useRecoveryStatus';
+import { MuscleHeatmap } from '../components/Body/MuscleHeatmap';
 
 interface BodyViewProps {
   weightHistory: WeightEntry[];
@@ -29,6 +32,9 @@ export const BodyView: React.FC<BodyViewProps> = ({
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [editTargetWeight, setEditTargetWeight] = useState(weightGoal.targetWeight?.toString() || '');
   const [editTargetDate, setEditTargetDate] = useState(weightGoal.targetDate || '');
+
+  // Recovery Logic
+  const { muscleStatus, globalReadiness, recommendation, fatiguedCount } = useRecoveryStatus(exerciseHistory);
 
   // --- DATA PROCESSING: WEIGHT ---
   const sortedWeights = [...weightHistory].sort(
@@ -154,6 +160,38 @@ export const BodyView: React.FC<BodyViewProps> = ({
             <Plus size={14} className="mr-1" /> Log
         </button>
       </div>
+
+      {/* 0. RECOVERY STATUS (NEW) */}
+      <GlassCard className="!p-0 overflow-hidden relative">
+          <div className="p-5 border-b border-white/5 flex justify-between items-center">
+              <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Battery size={20} className={globalReadiness > 80 ? 'text-accentGreen' : globalReadiness > 40 ? 'text-yellow-500' : 'text-red-500'} />
+                      Readiness
+                  </h2>
+                  <p className="text-xs text-secondary mt-1 max-w-[200px] leading-tight">{recommendation}</p>
+              </div>
+              
+              <div className="relative h-16 w-16 flex items-center justify-center">
+                  <svg className="absolute inset-0 w-full h-full -rotate-90">
+                      <circle cx="32" cy="32" r="28" stroke="#2C2C2E" strokeWidth="4" fill="none" />
+                      <circle 
+                        cx="32" cy="32" r="28" 
+                        stroke={globalReadiness > 80 ? '#30D158' : globalReadiness > 40 ? '#FFD60A' : '#FF453A'} 
+                        strokeWidth="4" 
+                        fill="none" 
+                        strokeDasharray={`${(globalReadiness / 100) * 175} 175`}
+                        strokeLinecap="round"
+                      />
+                  </svg>
+                  <span className="text-sm font-bold text-white">{globalReadiness}%</span>
+              </div>
+          </div>
+
+          <div className="p-4">
+              <MuscleHeatmap statusMap={muscleStatus} />
+          </div>
+      </GlassCard>
 
       {/* 1. WEIGHT & GOAL DASHBOARD */}
       {!isEditingGoal ? (

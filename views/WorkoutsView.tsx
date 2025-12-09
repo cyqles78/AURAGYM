@@ -970,6 +970,91 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
         <h1 className="text-3xl font-bold text-white tracking-tight">Workouts</h1>
       </div>
 
+      {/* Analytics Section */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2 px-1"><BarChart2 size={18}/> Training Insights</h2>
+        
+        {/* Horizontal Scroll Container for Stats */}
+        <div className="flex gap-4 overflow-x-auto pb-4 px-1 no-scrollbar snap-x">
+            
+            {/* 1. Volume Chart */}
+            <GlassCard className="min-w-[300px] w-[85vw] snap-center">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-white">Weekly Volume</h3>
+                    <span className="text-xs text-secondary font-medium">Last 7 Days</span>
+                </div>
+                <div className="h-32 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={weeklyVolumeData}>
+                            <defs>
+                                <linearGradient id="colorVol" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#FFFFFF" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#FFFFFF" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <Tooltip 
+                                cursor={{stroke: 'rgba(255,255,255,0.1)'}}
+                                contentStyle={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E', borderRadius: '8px', fontSize: '12px' }}
+                                itemStyle={{ color: '#fff' }}
+                            />
+                            <Area type="monotone" dataKey="volume" stroke="#FFFFFF" strokeWidth={2} fill="url(#colorVol)" />
+                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#8E8E93', fontSize: 10}} dy={10}/>
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </GlassCard>
+
+            {/* 2. Muscle Frequency */}
+            <GlassCard className="min-w-[260px] w-[70vw] snap-center">
+                <h3 className="text-sm font-bold text-white mb-4">Top Muscles</h3>
+                <div className="space-y-3">
+                    {muscleFreqData.length > 0 ? muscleFreqData.map((m, i) => (
+                        <div key={m.muscle}>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-white font-medium">{m.muscle}</span>
+                                <span className="text-secondary">{m.count} sessions</span>
+                            </div>
+                            <div className="h-1.5 bg-surfaceHighlight rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-accentBlue rounded-full" 
+                                    style={{ width: `${(m.count / Math.max(...muscleFreqData.map(d=>d.count))) * 100}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    )) : (
+                        <p className="text-xs text-secondary italic">No recent data</p>
+                    )}
+                </div>
+            </GlassCard>
+
+            {/* 3. Recent PRs */}
+            <GlassCard className="min-w-[260px] w-[70vw] snap-center">
+                <h3 className="text-sm font-bold text-white mb-4">Recent Records</h3>
+                <div className="space-y-3">
+                    {prProgressData.length > 0 ? prProgressData.map((pr, i) => (
+                        <div key={pr.name} className="flex justify-between items-center border-b border-white/5 last:border-0 pb-2 last:pb-0">
+                             <div>
+                                 <p className="text-xs font-bold text-white truncate max-w-[120px]">{pr.name}</p>
+                                 <p className="text-[10px] text-secondary">Est. 1RM</p>
+                             </div>
+                             <div className="text-right">
+                                 <p className="text-sm font-bold text-white">{pr.latest} kg</p>
+                                 {pr.improvement > 0 && (
+                                     <span className="text-[10px] text-accentGreen flex items-center justify-end">
+                                         <TrendingUp size={8} className="mr-0.5" /> +{pr.improvement}
+                                     </span>
+                                 )}
+                             </div>
+                        </div>
+                    )) : (
+                         <p className="text-xs text-secondary italic">Log more workouts to see PRs</p>
+                    )}
+                </div>
+            </GlassCard>
+
+        </div>
+      </div>
+
       {/* Programs Section */}
       <div className="space-y-4">
           <div className="flex justify-between items-center px-1">

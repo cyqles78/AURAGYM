@@ -1,10 +1,10 @@
 
-import React, { useRef, useState } from 'react';
-import { WorkoutSession, ExercisePerformanceEntry } from '../types';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
+import { WorkoutSession, ExercisePerformanceEntry, Exercise } from '../types';
 import { useActiveWorkout } from '../hooks/useActiveWorkout';
 import { RestTimer } from '../components/RestTimer';
 import { PlateCalculator } from '../components/PlateCalculator';
-import { Minus, Plus, CheckCircle2, MoreHorizontal, Clock, Play, Pause, Trash2, SkipForward, Calculator, History, Flame, StickyNote, Copy, ChevronDown } from 'lucide-react';
+import { Minus, Plus, CheckCircle2, MoreHorizontal, Clock, Play, Pause, Trash2, SkipForward, Calculator, History, Flame, StickyNote, Copy, ChevronDown, Link } from 'lucide-react';
 
 interface ActiveWorkoutScreenProps {
   initialSession: WorkoutSession;
@@ -24,6 +24,7 @@ export const ActiveWorkoutScreen: React.FC<ActiveWorkoutScreenProps> = ({
     restSeconds,
     restDuration,
     isResting,
+    activeSetFocus,
     togglePause,
     toggleSetComplete,
     updateSetField,
@@ -43,10 +44,53 @@ export const ActiveWorkoutScreen: React.FC<ActiveWorkoutScreenProps> = ({
   });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const exerciseRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Plate Calculator State
   const [showCalculator, setShowCalculator] = useState(false);
   const [calcTargetWeight, setCalcTargetWeight] = useState(0);
+
+  // Grouping Logic for Supersets
+  const exerciseGroups = useMemo(() => {
+    const groups: { isSuperset: boolean; id?: string; exercises: { data: Exercise; index: number }[] }[] = [];
+    
+    if (!session.exercises) return [];
+
+    let currentGroup: { isSuperset: boolean; id?: string; exercises: { data: Exercise; index: number }[] } | null = null;
+
+    session.exercises.forEach((ex, idx) => {
+        if (ex.supersetId) {
+            if (currentGroup && currentGroup.isSuperset && currentGroup.id === ex.supersetId) {
+                // Continue existing superset
+                currentGroup.exercises.push({ data: ex, index: idx });
+            } else {
+                // Push previous group if exists
+                if (currentGroup) groups.push(currentGroup);
+                // Start new superset
+                currentGroup = { isSuperset: true, id: ex.supersetId, exercises: [{ data: ex, index: idx }] };
+            }
+        } else {
+            // Push previous group if exists
+            if (currentGroup) groups.push(currentGroup);
+            // Single exercise group
+            currentGroup = { isSuperset: false, exercises: [{ data: ex, index: idx }] };
+        }
+    });
+    if (currentGroup) groups.push(currentGroup);
+
+    return groups;
+  }, [session.exercises]);
+
+  // Auto-Scroll Effect
+  useEffect(() => {
+    if (activeSetFocus) {
+        const refKey = `${activeSetFocus.exerciseIndex}-${activeSetFocus.setIndex}`;
+        const el = exerciseRefs.current[refKey];
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+  }, [activeSetFocus]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -98,10 +142,10 @@ export const ActiveWorkoutScreen: React.FC<ActiveWorkoutScreenProps> = ({
             </div>
         </div>
 
-        {/* Content Wrapper - Relative to contain overlay properly */}
+        {/* Content Wrapper */}
         <div className="flex-1 relative overflow-hidden flex flex-col">
             
-            {/* Pause Overlay - Absolute covering the content wrapper */}
+            {/* Pause Overlay */}
             {isPaused && (
                 <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex items-center justify-center px-8 animate-in fade-in duration-200">
                     <div className="bg-[#1C1C1E] border border-yellow-500/30 p-8 rounded-3xl text-center shadow-2xl max-w-sm w-full">
@@ -120,157 +164,55 @@ export const ActiveWorkoutScreen: React.FC<ActiveWorkoutScreenProps> = ({
 
             {/* Scrollable Exercises List */}
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-8 pb-32">
-                {(session.exercises || []).map((exercise, exIdx) => {
-                    const lastSession = getLastSession(exercise.name);
-                    const lastBestSet = lastSession?.sets.reduce((prev, curr) => (curr.weight || 0) > (prev.weight || 0) ? curr : prev, lastSession.sets[0]);
-
-                    return (
-                        <div key={exercise.id + exIdx} className="bg-[#1C1C1E] border border-[#2C2C2E] rounded-2xl p-4 space-y-4 shadow-lg">
-                            <div className="flex justify-between items-start border-b border-[#2C2C2E] pb-3">
-                                <div>
-                                    <h3 className="text-xl font-bold text-white">{exercise.name}</h3>
-                                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                                        <div className="flex items-center gap-1 text-xs text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded">
-                                            <Clock size={12} />
-                                            <span>{exercise.restTimeSeconds || 60}s</span>
-                                        </div>
-                                        <span className="text-xs text-[#8E8E93]">{exercise.targetMuscle}</span>
-                                        
-                                        {/* History Context Pill */}
-                                        {lastBestSet && (
-                                            <div className="flex items-center gap-1 text-[10px] text-accentBlue bg-accentBlue/10 px-2 py-0.5 rounded border border-accentBlue/20">
-                                                <History size={10} />
-                                                <span>Last: {lastBestSet.weight}kg × {lastBestSet.reps}</span>
-                                            </div>
-                                        )}
-                                    </div>
+                
+                {exerciseGroups.map((group, groupIdx) => {
+                    // SUPERSET CONTAINER
+                    if (group.isSuperset) {
+                        return (
+                            <div key={`group-${groupIdx}`} className="relative pl-4">
+                                {/* Visual Connector */}
+                                <div className="absolute left-0 top-2 bottom-2 w-1 bg-accentBlue rounded-full" />
+                                <div className="absolute -left-3 top-1/2 -translate-y-1/2 bg-[#1C1C1E] p-1.5 rounded-full border border-accentBlue text-accentBlue z-10 shadow-lg">
+                                    <Link size={14} />
                                 </div>
-
-                                {/* Header Actions */}
-                                <div className="flex items-center gap-2">
-                                     {/* Add Warm-up Button */}
-                                    <button
-                                        onClick={() => addWarmupSets(exIdx)}
-                                        disabled={isPaused}
-                                        className="p-2 bg-[#2C2C2E] rounded-lg text-orange-500 hover:bg-orange-500/20 transition"
-                                        title="Add Warm-up Sets"
-                                    >
-                                        <Flame size={16} />
-                                    </button>
-
-                                    {/* Copy Last Session Button */}
-                                    {lastSession && (
-                                        <button
-                                            onClick={() => copySetsFromHistory(exIdx, lastSession.sets)}
-                                            disabled={isPaused}
-                                            className="p-2 bg-[#2C2C2E] rounded-lg text-accentBlue hover:bg-accentBlue/20 transition"
-                                            title="Copy Last Session"
-                                        >
-                                            <Copy size={16} />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Persistent Notes Field */}
-                            <div className="relative">
-                                <StickyNote size={14} className="absolute left-3 top-3 text-[#8E8E93]" />
-                                <input
-                                    type="text"
-                                    value={exercise.notes || ''}
-                                    onChange={(e) => updateExerciseNote(exIdx, e.target.value)}
-                                    placeholder={lastSession ? "Notes..." : "Add notes..."}
-                                    className="w-full bg-[#101214] border border-[#2C2C2E] rounded-xl py-2.5 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-[#8E8E93] placeholder:text-[#555]"
-                                />
-                            </div>
-                            
-                            {/* Sets Header */}
-                            <div className="grid grid-cols-[30px_1fr_1fr_40px_30px] gap-2 px-1 text-[10px] text-[#8E8E93] uppercase font-bold tracking-wider text-center">
-                                <span>#</span>
-                                <span>kg</span>
-                                <span>Reps</span>
-                                <span>Done</span>
-                                <span></span>
-                            </div>
-
-                            <div className="space-y-2">
-                                {(exercise.sets || []).map((set, setIdx) => {
-                                    const isWarmup = set.isWarmup;
-                                    return (
-                                        <div 
-                                            key={set.id} 
-                                            className={`grid grid-cols-[30px_1fr_1fr_40px_30px] gap-2 items-center transition-all ${set.completed ? 'opacity-50' : 'opacity-100'}`}
-                                        >
-                                            <span className={`font-bold text-center rounded-md py-2.5 text-xs ${isWarmup ? 'text-orange-500 bg-orange-500/10' : 'text-[#8E8E93] bg-[#2C2C2E]'}`}>
-                                                {isWarmup ? 'W' : setIdx + 1 - (exercise.sets.filter(s => s.isWarmup).length)}
-                                            </span>
-                                            
-                                            <div className="relative">
-                                                <input 
-                                                    type="text" 
-                                                    value={set.weight}
-                                                    onChange={(e) => updateSetField(exIdx, setIdx, 'weight', e.target.value)}
-                                                    className={`w-full bg-[#000] border ${isWarmup ? 'border-orange-900/50' : 'border-[#2C2C2E]'} rounded-xl text-center py-2.5 text-white font-bold outline-none focus:border-accent focus:bg-[#2C2C2E] transition-colors text-sm pr-6`}
-                                                    inputMode="decimal"
-                                                    placeholder="0"
-                                                    disabled={isPaused}
+                                
+                                <div className="space-y-4">
+                                    {group.exercises.map((item, itemIdx) => {
+                                        const alphabetLabel = String.fromCharCode(65 + itemIdx); // A, B, C...
+                                        return (
+                                            <div key={item.data.id + item.index} className="relative">
+                                                {/* Alphabet Badge */}
+                                                <div className="absolute -left-9 top-6 bg-accentBlue text-black font-bold text-[10px] h-5 w-5 rounded-full flex items-center justify-center z-20 border border-[#1C1C1E]">
+                                                    {groupIdx + 1}{alphabetLabel}
+                                                </div>
+                                                <ExerciseCard 
+                                                    exercise={item.data} 
+                                                    exIdx={item.index}
+                                                    lastSession={getLastSession(item.data.name)}
+                                                    isPaused={isPaused}
+                                                    isSuperset={true}
+                                                    {...{ toggleSetComplete, updateSetField, addSet, deleteSet, skipExercise, addWarmupSets, copySetsFromHistory, updateExerciseNote, openCalculator, exerciseRefs }}
                                                 />
-                                                {/* Plate Calc Trigger */}
-                                                <button 
-                                                    onClick={() => openCalculator(set.weight)}
-                                                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-[#555] hover:text-white"
-                                                    tabIndex={-1}
-                                                >
-                                                    <Calculator size={12} />
-                                                </button>
                                             </div>
-
-                                            <input 
-                                                type="text" 
-                                                value={set.reps}
-                                                onChange={(e) => updateSetField(exIdx, setIdx, 'reps', e.target.value)}
-                                                className={`bg-[#000] border ${isWarmup ? 'border-orange-900/50' : 'border-[#2C2C2E]'} rounded-xl text-center py-2.5 text-white font-bold outline-none focus:border-accent focus:bg-[#2C2C2E] transition-colors text-sm`}
-                                                inputMode="numeric"
-                                                placeholder="0"
-                                                disabled={isPaused}
-                                            />
-                                            <button 
-                                                onClick={() => toggleSetComplete(exIdx, setIdx)}
-                                                disabled={isPaused}
-                                                className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-[#30D158] text-white shadow-[0_0_15px_rgba(48,209,88,0.4)]' : 'bg-[#2C2C2E] text-[#8E8E93] hover:bg-[#3A3A3C]'}`}
-                                            >
-                                                <CheckCircle2 size={20} />
-                                            </button>
-                                            <button 
-                                                onClick={() => deleteSet(set.id)}
-                                                disabled={isPaused}
-                                                className="h-10 w-8 flex items-center justify-center text-[#8E8E93] hover:text-red-400 transition"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
+                        );
+                    }
 
-                            <div className="flex justify-between items-center pt-2">
-                                <button 
-                                    onClick={() => skipExercise(exercise.id)}
-                                    disabled={isPaused}
-                                    className="text-xs font-bold text-[#8E8E93] hover:text-white transition flex items-center gap-1 px-2 py-2"
-                                >
-                                    <SkipForward size={14} /> Skip Exercise
-                                </button>
-
-                                <button 
-                                    onClick={() => addSet(exIdx)}
-                                    disabled={isPaused}
-                                    className="text-xs font-bold text-white bg-[#2C2C2E] border border-white/10 px-4 py-2.5 rounded-lg hover:bg-white/10 transition flex items-center gap-1"
-                                >
-                                    <Plus size={14} /> Add Set
-                                </button>
-                            </div>
-                        </div>
+                    // STANDARD SINGLE EXERCISE
+                    const item = group.exercises[0];
+                    return (
+                        <ExerciseCard 
+                            key={item.data.id + item.index} 
+                            exercise={item.data} 
+                            exIdx={item.index}
+                            lastSession={getLastSession(item.data.name)}
+                            isPaused={isPaused}
+                            isSuperset={false}
+                            {...{ toggleSetComplete, updateSetField, addSet, deleteSet, skipExercise, addWarmupSets, copySetsFromHistory, updateExerciseNote, openCalculator, exerciseRefs }}
+                        />
                     );
                 })}
 
@@ -302,3 +244,162 @@ export const ActiveWorkoutScreen: React.FC<ActiveWorkoutScreenProps> = ({
     </div>
   );
 };
+
+// Extracted Card Component for cleaner rendering logic
+const ExerciseCard: React.FC<any> = ({ 
+    exercise, exIdx, lastSession, isPaused, isSuperset,
+    toggleSetComplete, updateSetField, addSet, deleteSet, skipExercise, addWarmupSets, copySetsFromHistory, updateExerciseNote, openCalculator, exerciseRefs 
+}) => {
+    const lastBestSet = lastSession?.sets.reduce((prev: any, curr: any) => (curr.weight || 0) > (prev.weight || 0) ? curr : prev, lastSession.sets[0]);
+
+    return (
+        <div className={`bg-[#1C1C1E] border ${isSuperset ? 'border-accentBlue/20' : 'border-[#2C2C2E]'} rounded-2xl p-4 space-y-4 shadow-lg`}>
+            <div className="flex justify-between items-start border-b border-[#2C2C2E] pb-3">
+                <div>
+                    <h3 className="text-xl font-bold text-white">{exercise.name}</h3>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1 text-xs text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded">
+                            <Clock size={12} />
+                            <span>{exercise.restTimeSeconds || 60}s</span>
+                        </div>
+                        <span className="text-xs text-[#8E8E93]">{exercise.targetMuscle}</span>
+                        
+                        {/* History Context Pill */}
+                        {lastBestSet && (
+                            <div className="flex items-center gap-1 text-[10px] text-accentBlue bg-accentBlue/10 px-2 py-0.5 rounded border border-accentBlue/20">
+                                <History size={10} />
+                                <span>Last: {lastBestSet.weight}kg × {lastBestSet.reps}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Header Actions */}
+                <div className="flex items-center gap-2">
+                        {/* Add Warm-up Button */}
+                    <button
+                        onClick={() => addWarmupSets(exIdx)}
+                        disabled={isPaused}
+                        className="p-2 bg-[#2C2C2E] rounded-lg text-orange-500 hover:bg-orange-500/20 transition"
+                        title="Add Warm-up Sets"
+                    >
+                        <Flame size={16} />
+                    </button>
+
+                    {/* Copy Last Session Button */}
+                    {lastSession && (
+                        <button
+                            onClick={() => copySetsFromHistory(exIdx, lastSession.sets)}
+                            disabled={isPaused}
+                            className="p-2 bg-[#2C2C2E] rounded-lg text-accentBlue hover:bg-accentBlue/20 transition"
+                            title="Copy Last Session"
+                        >
+                            <Copy size={16} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Persistent Notes Field */}
+            <div className="relative">
+                <StickyNote size={14} className="absolute left-3 top-3 text-[#8E8E93]" />
+                <input
+                    type="text"
+                    value={exercise.notes || ''}
+                    onChange={(e) => updateExerciseNote(exIdx, e.target.value)}
+                    placeholder={lastSession ? "Notes..." : "Add notes..."}
+                    className="w-full bg-[#101214] border border-[#2C2C2E] rounded-xl py-2.5 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-[#8E8E93] placeholder:text-[#555]"
+                />
+            </div>
+            
+            {/* Sets Header */}
+            <div className="grid grid-cols-[30px_1fr_1fr_40px_30px] gap-2 px-1 text-[10px] text-[#8E8E93] uppercase font-bold tracking-wider text-center">
+                <span>#</span>
+                <span>kg</span>
+                <span>Reps</span>
+                <span>Done</span>
+                <span></span>
+            </div>
+
+            <div className="space-y-2">
+                {(exercise.sets || []).map((set: any, setIdx: number) => {
+                    const isWarmup = set.isWarmup;
+                    return (
+                        <div 
+                            key={set.id} 
+                            // Assign Ref for auto-scroll logic
+                            ref={el => { if (exerciseRefs && exerciseRefs.current) exerciseRefs.current[`${exIdx}-${setIdx}`] = el }}
+                            className={`grid grid-cols-[30px_1fr_1fr_40px_30px] gap-2 items-center transition-all ${set.completed ? 'opacity-50' : 'opacity-100'}`}
+                        >
+                            <span className={`font-bold text-center rounded-md py-2.5 text-xs ${isWarmup ? 'text-orange-500 bg-orange-500/10' : 'text-[#8E8E93] bg-[#2C2C2E]'}`}>
+                                {isWarmup ? 'W' : setIdx + 1 - (exercise.sets.filter((s: any) => s.isWarmup).length)}
+                            </span>
+                            
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    value={set.weight}
+                                    onChange={(e) => updateSetField(exIdx, setIdx, 'weight', e.target.value)}
+                                    className={`w-full bg-[#000] border ${isWarmup ? 'border-orange-900/50' : 'border-[#2C2C2E]'} rounded-xl text-center py-2.5 text-white font-bold outline-none focus:border-accent focus:bg-[#2C2C2E] transition-colors text-sm pr-6`}
+                                    inputMode="decimal"
+                                    placeholder="0"
+                                    disabled={isPaused}
+                                />
+                                {/* Plate Calc Trigger */}
+                                <button 
+                                    onClick={() => openCalculator(set.weight)}
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-[#555] hover:text-white"
+                                    tabIndex={-1}
+                                >
+                                    <Calculator size={12} />
+                                </button>
+                            </div>
+
+                            <input 
+                                type="text" 
+                                value={set.reps}
+                                onChange={(e) => updateSetField(exIdx, setIdx, 'reps', e.target.value)}
+                                className={`bg-[#000] border ${isWarmup ? 'border-orange-900/50' : 'border-[#2C2C2E]'} rounded-xl text-center py-2.5 text-white font-bold outline-none focus:border-accent focus:bg-[#2C2C2E] transition-colors text-sm`}
+                                inputMode="numeric"
+                                placeholder="0"
+                                disabled={isPaused}
+                            />
+                            <button 
+                                onClick={() => toggleSetComplete(exIdx, setIdx)}
+                                disabled={isPaused}
+                                className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-[#30D158] text-white shadow-[0_0_15px_rgba(48,209,88,0.4)]' : 'bg-[#2C2C2E] text-[#8E8E93] hover:bg-[#3A3A3C]'}`}
+                            >
+                                <CheckCircle2 size={20} />
+                            </button>
+                            <button 
+                                onClick={() => deleteSet(set.id)}
+                                disabled={isPaused}
+                                className="h-10 w-8 flex items-center justify-center text-[#8E8E93] hover:text-red-400 transition"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+                <button 
+                    onClick={() => skipExercise(exercise.id)}
+                    disabled={isPaused}
+                    className="text-xs font-bold text-[#8E8E93] hover:text-white transition flex items-center gap-1 px-2 py-2"
+                >
+                    <SkipForward size={14} /> Skip Exercise
+                </button>
+
+                <button 
+                    onClick={() => addSet(exIdx)}
+                    disabled={isPaused}
+                    className="text-xs font-bold text-white bg-[#2C2C2E] border border-white/10 px-4 py-2.5 rounded-lg hover:bg-white/10 transition flex items-center gap-1"
+                >
+                    <Plus size={14} /> Add Set
+                </button>
+            </div>
+        </div>
+    );
+}

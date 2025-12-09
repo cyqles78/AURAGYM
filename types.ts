@@ -9,6 +9,7 @@ export interface Exercise {
   notes?: string;
   restTimeSeconds: number; // e.g. 90
   videoUrl?: string; // New field for video links
+  supersetId?: string; // Identifies exercises that are part of the same superset/circuit
 }
 
 export interface WorkoutSet {
