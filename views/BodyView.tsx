@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { WeightEntry, MeasurementEntry, WeightGoal, ExercisePerformanceEntry } from '../types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, LineChart, Line } from 'recharts';
-import { Camera, Ruler, TrendingUp, TrendingDown, Plus, X, Target, Edit2, Trophy, Dumbbell, Activity, Battery } from 'lucide-react';
+import { Camera, Ruler, TrendingUp, TrendingDown, Plus, X, Target, Edit2, Trophy, Dumbbell, Activity, Battery, Zap } from 'lucide-react';
 import { useRecoveryStatus } from '../hooks/useRecoveryStatus';
 import { MuscleHeatmap } from '../components/Body/MuscleHeatmap';
 
@@ -161,37 +161,46 @@ export const BodyView: React.FC<BodyViewProps> = ({
         </button>
       </div>
 
-      {/* 0. RECOVERY STATUS (NEW) */}
-      <GlassCard className="!p-0 overflow-hidden relative">
-          <div className="p-5 border-b border-white/5 flex justify-between items-center">
+      {/* 0. RECOVERY STATUS (State of the Art) */}
+      <div className="relative overflow-hidden rounded-[32px] bg-[#101214] border border-white/10 shadow-2xl">
+          {/* Header */}
+          <div className="p-6 flex justify-between items-start bg-gradient-to-b from-white/5 to-transparent">
               <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Battery size={20} className={globalReadiness > 80 ? 'text-accentGreen' : globalReadiness > 40 ? 'text-yellow-500' : 'text-red-500'} />
-                      Readiness
-                  </h2>
-                  <p className="text-xs text-secondary mt-1 max-w-[200px] leading-tight">{recommendation}</p>
+                  <div className="flex items-center gap-2 mb-2">
+                      <Zap size={16} className={globalReadiness > 80 ? 'text-cyan-400' : 'text-yellow-500'} fill="currentColor"/>
+                      <span className="text-xs font-bold text-slate-400 tracking-wider uppercase">System Readiness</span>
+                  </div>
+                  <h2 className="text-4xl font-bold text-white tracking-tight">{globalReadiness}%</h2>
+                  <p className="text-xs text-slate-400 mt-2 max-w-[200px] leading-relaxed border-l-2 border-white/10 pl-2">
+                      {recommendation}
+                  </p>
               </div>
               
-              <div className="relative h-16 w-16 flex items-center justify-center">
-                  <svg className="absolute inset-0 w-full h-full -rotate-90">
-                      <circle cx="32" cy="32" r="28" stroke="#2C2C2E" strokeWidth="4" fill="none" />
+              {/* Mini Gauge */}
+              <div className="relative h-16 w-16">
+                  <svg className="h-full w-full -rotate-90">
+                      <circle cx="32" cy="32" r="28" stroke="#1f2937" strokeWidth="4" fill="none" />
                       <circle 
                         cx="32" cy="32" r="28" 
-                        stroke={globalReadiness > 80 ? '#30D158' : globalReadiness > 40 ? '#FFD60A' : '#FF453A'} 
+                        stroke={globalReadiness > 80 ? '#22d3ee' : globalReadiness > 40 ? '#facc15' : '#ef4444'} 
                         strokeWidth="4" 
                         fill="none" 
                         strokeDasharray={`${(globalReadiness / 100) * 175} 175`}
                         strokeLinecap="round"
+                        className="transition-all duration-1000 ease-out"
                       />
                   </svg>
-                  <span className="text-sm font-bold text-white">{globalReadiness}%</span>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                      <Battery size={20} className={globalReadiness > 80 ? 'text-cyan-400' : 'text-slate-500'} />
+                  </div>
               </div>
           </div>
 
-          <div className="p-4">
+          {/* Interactive Heatmap */}
+          <div className="px-4 pb-6">
               <MuscleHeatmap statusMap={muscleStatus} />
           </div>
-      </GlassCard>
+      </div>
 
       {/* 1. WEIGHT & GOAL DASHBOARD */}
       {!isEditingGoal ? (
