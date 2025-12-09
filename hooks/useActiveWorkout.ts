@@ -152,7 +152,7 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
     }
   };
 
-  // New Function: Delete specific set by ID
+  // Delete specific set by ID
   const deleteSet = (setId: string) => {
     if (isPaused) return;
 
@@ -164,13 +164,62 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
     setSession({ ...session, exercises: updatedExercises });
   };
 
-  // New Function: Skip entire exercise
+  // Skip entire exercise
   const skipExercise = (exerciseId: string) => {
     if (isPaused) return;
     
     // Filter out the exercise
     const updatedExercises = session.exercises.filter(ex => ex.id !== exerciseId);
     setSession({ ...session, exercises: updatedExercises });
+  };
+
+  // --- PREMIUM FEATURES (Warmup, Copy History, Notes) ---
+
+  const addWarmupSets = (exerciseIndex: number) => {
+    if (isPaused) return;
+
+    const updatedExercises = [...session.exercises];
+    const exercise = updatedExercises[exerciseIndex];
+    
+    // Determine working weight from first set, or default 20kg
+    const workingSet = exercise.sets[0];
+    const workingWeight = parseFloat(workingSet?.weight) || 20;
+
+    // Helper to generate a new ID
+    const genId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString()) + Math.random();
+
+    const warmups: WorkoutSet[] = [
+        { id: genId(), reps: '10', weight: (Math.round(workingWeight * 0.5 / 2.5) * 2.5).toString(), completed: false, isWarmup: true },
+        { id: genId(), reps: '5', weight: (Math.round(workingWeight * 0.7 / 2.5) * 2.5).toString(), completed: false, isWarmup: true },
+        { id: genId(), reps: '3', weight: (Math.round(workingWeight * 0.9 / 2.5) * 2.5).toString(), completed: false, isWarmup: true },
+    ];
+
+    updatedExercises[exerciseIndex].sets = [...warmups, ...exercise.sets];
+    setSession({ ...session, exercises: updatedExercises });
+  };
+
+  const copySetsFromHistory = (exerciseIndex: number, historySets: {reps: number, weight?: number}[]) => {
+     if (isPaused) return;
+
+     const updatedExercises = [...session.exercises];
+     
+     // We map history sets to new workout sets
+     const newSets: WorkoutSet[] = historySets.map(h => ({
+         id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString()) + Math.random(),
+         reps: h.reps.toString(),
+         weight: (h.weight || 0).toString(),
+         completed: false,
+         isWarmup: false
+     }));
+
+     updatedExercises[exerciseIndex].sets = newSets;
+     setSession({ ...session, exercises: updatedExercises });
+  };
+
+  const updateExerciseNote = (exerciseIndex: number, note: string) => {
+      const updatedExercises = [...session.exercises];
+      updatedExercises[exerciseIndex].notes = note;
+      setSession({ ...session, exercises: updatedExercises });
   };
 
   // --- REST CONTROLS ---
@@ -225,6 +274,9 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
     removeSet,
     deleteSet,
     skipExercise,
+    addWarmupSets,
+    copySetsFromHistory,
+    updateExerciseNote,
     
     skipRest,
     addRestTime,

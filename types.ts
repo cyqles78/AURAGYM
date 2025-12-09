@@ -17,6 +17,7 @@ export interface WorkoutSet {
   weight: string; // "20kg"
   completed: boolean;
   rpe?: number;
+  isWarmup?: boolean; // New field for warm-up sets
 }
 
 export interface WorkoutPlan {

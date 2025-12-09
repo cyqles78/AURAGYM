@@ -7,6 +7,7 @@ import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calend
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, Cell, XAxis, YAxis, AreaChart, Area, Tooltip, CartesianGrid } from 'recharts';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 import { WorkoutBuilderView } from './WorkoutBuilderView';
+import { WorkoutSummaryScreen } from './WorkoutSummaryScreen';
 
 interface WorkoutsViewProps {
   plans: WorkoutPlan[];
@@ -21,7 +22,7 @@ interface WorkoutsViewProps {
   exerciseHistory: ExercisePerformanceEntry[];
 }
 
-type WorkoutsMode = 'LIST' | 'GENERATOR' | 'ACTIVE_SESSION' | 'CREATE_PLAN' | 'PROGRAM_BUILDER' | 'PROGRAM_DETAIL' | 'BUILDER';
+type WorkoutsMode = 'LIST' | 'GENERATOR' | 'ACTIVE_SESSION' | 'CREATE_PLAN' | 'PROGRAM_BUILDER' | 'PROGRAM_DETAIL' | 'BUILDER' | 'SUMMARY';
 
 interface ComputedExerciseStats {
   exerciseName: string;
@@ -53,6 +54,12 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<WorkoutsMode>('LIST');
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
+
+  // Summary State
+  const [lastSessionData, setLastSessionData] = useState<{
+      workout: CompletedWorkout;
+      prs: ExercisePerformanceEntry[];
+  } | null>(null);
 
   // Single Workout Generator State
   const [goal, setGoal] = useState('Hypertrophy');
@@ -204,7 +211,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     finishedSession.exercises.forEach(ex => {
         const validSets = ex.sets.filter(s => {
            const r = parseFloat(s.reps);
-           const w = parseFloat(s.weight);
            // Count volume if completed
            return !isNaN(r) && r > 0 && s.completed;
         });
@@ -275,7 +281,13 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
 
     onCompleteSession(completedWorkout, performanceEntries);
     setActiveSession(null);
-    setViewMode('LIST');
+    
+    // Switch to Summary View
+    setLastSessionData({
+        workout: completedWorkout,
+        prs: performanceEntries.filter(p => p.isPR)
+    });
+    setViewMode('SUMMARY');
   };
 
   const handleGenerateSingle = async () => {
@@ -483,7 +495,19 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     );
   }
 
-  // 2. WORKOUT BUILDER
+  // 2. WORKOUT SUMMARY (NEW)
+  if (viewMode === 'SUMMARY' && lastSessionData) {
+      return (
+          <WorkoutSummaryScreen 
+            workout={lastSessionData.workout}
+            prs={lastSessionData.prs}
+            history={completedWorkouts}
+            onClose={() => setViewMode('LIST')}
+          />
+      );
+  }
+
+  // 3. WORKOUT BUILDER
   if (viewMode === 'BUILDER') {
       return (
           <WorkoutBuilderView 
@@ -498,7 +522,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
       );
   }
 
-  // 3. SINGLE WORKOUT GENERATOR
+  // 4. SINGLE WORKOUT GENERATOR
   if (viewMode === 'GENERATOR') {
       return (
         <div className="pb-28 pt-6 space-y-6 min-h-screen">
@@ -550,13 +574,11 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
       )
   }
 
-  // 4. PROGRAM BUILDER WIZARD
+  // 5. PROGRAM BUILDER WIZARD
   if (viewMode === 'PROGRAM_BUILDER') {
-      // ... (No Changes to this existing block)
       return (
           <div className="pb-28 pt-6 space-y-6 min-h-screen animate-in slide-in-from-right">
-              {/* Keeping existing implementation same as provided in prompt */}
-               <div className="flex items-center space-x-2 mb-6 px-1">
+              <div className="flex items-center space-x-2 mb-6 px-1">
                   <button onClick={() => {
                       if (generatedProgram) {
                           setGeneratedProgram(null);
@@ -806,9 +828,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
       );
   }
 
-  // 5. PROGRAM DETAIL VIEW (Existing)
+  // 6. PROGRAM DETAIL VIEW
   if (viewMode === 'PROGRAM_DETAIL' && selectedProgram) {
-    // ... (Keeping existing implementation details)
     const validWeeks = (selectedProgram.weeks || []).filter(w => w.days && w.days.length > 0);
     const activeWeek = validWeeks[selectedWeekIndex] || validWeeks[0];
 
@@ -1018,119 +1039,40 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
                             {plan.difficulty}
                         </span>
                         {plan.tags.includes('Custom') && (
-                            <span className="px-2 py-1 rounded text-[10px] font-bold bg-accent/10 text-accent uppercase tracking-wide">
+                            <span className="px-2 py-1 rounded text-[10px] font-bold bg-white text-black uppercase tracking-wide">
                                 Custom
                             </span>
                         )}
                     </div>
                     <h3 className="text-xl font-bold text-white">{plan.title}</h3>
+                    <div className="flex items-center text-xs text-secondary mt-1">
+                        <Clock size={12} className="mr-1" /> {plan.duration}
+                    </div>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-white text-black flex items-center justify-center transition-transform active:scale-95">
-                      <Play fill="currentColor" size={14} className="ml-0.5" />
+                  <div className="h-8 w-8 rounded-full bg-surfaceHighlight flex items-center justify-center group-hover:bg-white group-hover:text-black transition-colors">
+                      <Play size={16} fill="currentColor" />
                   </div>
              </div>
-                
-             <div className="flex items-center space-x-6 text-secondary text-xs font-medium border-t border-border pt-4">
-                  <div className="flex items-center">
-                    <Clock size={14} className="mr-2" />
-                    {plan.duration}
-                  </div>
-                  <div className="flex items-center">
-                    <Dumbbell size={14} className="mr-2" />
-                    {(plan.exercises || []).length} Exercises
-                  </div>
+
+             <div className="space-y-1">
+                 {plan.exercises.slice(0, 3).map((ex, i) => (
+                     <div key={i} className="text-sm text-slate-400 flex items-center">
+                         <div className="h-1 w-1 rounded-full bg-slate-600 mr-2"></div>
+                         {ex.name} <span className="text-slate-600 mx-1">•</span> {ex.sets.length} sets
+                     </div>
+                 ))}
+                 {plan.exercises.length > 3 && (
+                     <div className="text-xs text-slate-600 pl-3">+{plan.exercises.length - 3} more</div>
+                 )}
              </div>
           </GlassCard>
         ))}
+        {plans.length === 0 && (
+             <div className="text-center py-10 text-slate-500 border border-dashed border-white/10 rounded-2xl">
+                 No workout plans found. Create one or generate with AI.
+             </div>
+        )}
       </div>
-
-      {/* --- NEW: ANALYTICS DASHBOARD (Existing) --- */}
-      {/* ... Keeping existing analytics code ... */}
-      <div className="space-y-4">
-          <div className="flex justify-between items-center px-1 border-t border-white/5 pt-6">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><BarChart2 size={18}/> Analytics</h2>
-          </div>
-          {/* ... */}
-          <GlassCard className="space-y-6">
-              {/* Volume Chart */}
-              <div>
-                  <div className="flex justify-between items-end mb-4">
-                      <div>
-                          <p className="text-xs text-secondary font-bold uppercase tracking-wider">Weekly Volume</p>
-                          <p className="text-sm text-slate-400">Total load (kg) last 7 days</p>
-                      </div>
-                      <div className="text-right">
-                         <span className="text-xl font-bold text-white">
-                             {weeklyVolumeData.reduce((acc, d) => acc + d.volume, 0) > 0 
-                               ? (weeklyVolumeData.reduce((acc, d) => acc + d.volume, 0) / 1000).toFixed(1) + 'k' 
-                               : '0'}
-                         </span>
-                         <span className="text-xs text-secondary ml-1">kg</span>
-                      </div>
-                  </div>
-                  <div className="h-40 w-full">
-                      {weeklyVolumeData.every(d => d.volume === 0) ? (
-                          <div className="h-full flex items-center justify-center text-xs text-secondary italic border border-dashed border-white/5 rounded-xl">
-                              No workout data this week
-                          </div>
-                      ) : (
-                          <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={weeklyVolumeData}>
-                                  <Bar dataKey="volume" radius={[4, 4, 0, 0]}>
-                                      {weeklyVolumeData.map((entry, index) => (
-                                          <Cell key={`cell-${index}`} fill={entry.volume > 0 ? '#FFFFFF' : '#2C2C2E'} />
-                                      ))}
-                                  </Bar>
-                                  <Tooltip 
-                                    cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                                    contentStyle={{ backgroundColor: '#1C1C1E', borderColor: '#333', borderRadius: '8px', fontSize: '12px' }}
-                                    itemStyle={{ color: '#fff' }}
-                                    formatter={(value: number) => [`${value} kg`, 'Volume']}
-                                  />
-                                  <XAxis 
-                                    dataKey="day" 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    tick={{fill: '#8E8E93', fontSize: 10}} 
-                                    dy={10}
-                                  />
-                              </BarChart>
-                          </ResponsiveContainer>
-                      )}
-                  </div>
-              </div>
-          </GlassCard>
-      </div>
-
-      {/* RECENT WORKOUTS HISTORY (Existing) */}
-      {/* ... Keeping existing code ... */}
-      
-      {/* EXERCISE DETAIL MODAL (Existing) */}
-      {selectedExerciseStats && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-              {/* ... existing modal code ... */}
-              <div className="w-full max-w-md bg-[#1C1C1E] rounded-[24px] border border-border flex flex-col max-h-[90vh] shadow-2xl overflow-hidden">
-                   <div className="p-5 border-b border-white/5 flex justify-between items-center bg-[#1C1C1E]">
-                      <div className="min-w-0 pr-4">
-                          <h2 className="text-xl font-bold text-white truncate">{selectedExerciseStats.exerciseName}</h2>
-                          <p className="text-xs text-secondary mt-0.5">Performance History</p>
-                      </div>
-                      <button 
-                          onClick={() => setSelectedExerciseStats(null)} 
-                          className="bg-surfaceHighlight p-2 rounded-full text-white hover:bg-white hover:text-black transition"
-                      >
-                          <X size={20} />
-                      </button>
-                  </div>
-                  <div className="overflow-y-auto p-5 space-y-6">
-                      {/* ... rest of modal content ... */}
-                      {/* Placeholder for brevity since original file was large, ensuring closing tags match */}
-                      <p className="text-sm text-secondary">Stats visualization here...</p>
-                  </div>
-              </div>
-          </div>
-      )}
-
     </div>
   );
 };
