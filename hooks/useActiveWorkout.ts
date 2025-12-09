@@ -31,9 +31,6 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
       interval = setInterval(() => {
         const now = Date.now();
         // Calculate active duration: Total elapsed wall time minus accumulated pause time
-        // Note: We don't subtract the *current* pending pause time here, only finalized pauses.
-        // If we want elapsedSeconds to freeze visually during pause, we do that in the render logic or here.
-        // But since we stop the interval when paused, this calculation runs only when active.
         const currentTotalElapsed = now - startTime;
         const netElapsed = currentTotalElapsed - totalPausedTime;
         setElapsedSeconds(Math.floor(netElapsed / 1000));
@@ -63,7 +60,8 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
   // --- REST TIMER ---
   useEffect(() => {
     let interval: any;
-    if (isResting && restSeconds > 0) {
+    // Only count down if NOT paused
+    if (isResting && restSeconds > 0 && !isPaused) {
       interval = setInterval(() => setRestSeconds(t => t - 1), 1000);
     } else if (isResting && restSeconds === 0) {
       setIsResting(false);
@@ -72,7 +70,7 @@ export const useActiveWorkout = ({ initialSession, exerciseHistory, onComplete }
       }
     }
     return () => clearInterval(interval);
-  }, [isResting, restSeconds]);
+  }, [isResting, restSeconds, isPaused]);
 
   // --- EXERCISE & SET MANAGEMENT ---
 
