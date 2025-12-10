@@ -5,9 +5,10 @@ interface GlassCardProps {
   className?: string;
   onClick?: () => void;
   accent?: boolean;
+  style?: React.CSSProperties;
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({ children, className = '', onClick, accent = false }) => {
+export const GlassCard: React.FC<GlassCardProps> = ({ children, className = '', onClick, accent = false, style }) => {
   return (
     <div 
       onClick={onClick}
@@ -18,7 +19,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({ children, className = '', 
         ${className}
       `}
       style={{
-        boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+        boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+        ...style
       }}
     >
       {children}

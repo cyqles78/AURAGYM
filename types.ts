@@ -1,5 +1,4 @@
 
-
 export interface Exercise {
   id: string;
   name: string;
@@ -7,18 +6,24 @@ export interface Exercise {
   equipment: string;
   sets: WorkoutSet[];
   notes?: string;
-  restTimeSeconds: number; // e.g. 90
-  videoUrl?: string; // New field for video links
-  supersetId?: string; // Identifies exercises that are part of the same superset/circuit
+  restTimeSeconds: number; 
+  videoUrl?: string; 
+  supersetId?: string; 
+  
+  // Encyclopedia Fields
+  instructions?: string[];
+  secondaryMuscles?: string[];
+  difficulty?: 'Beginner' | 'Intermediate' | 'Advanced';
+  mechanic?: 'Compound' | 'Isolation';
 }
 
 export interface WorkoutSet {
   id: string;
-  reps: string; // "8-10" or "10"
-  weight: string; // "20kg"
+  reps: string; 
+  weight: string; 
   completed: boolean;
   rpe?: number;
-  isWarmup?: boolean; // New field for warm-up sets
+  isWarmup?: boolean; 
 }
 
 export interface WorkoutPlan {
@@ -37,23 +42,23 @@ export interface Program {
   id: string;
   name: string;
   description?: string;
-  goal: string;          // e.g. "Hypertrophy", "Strength", "Fat loss"
+  goal: string;          
   durationWeeks: number;
   daysPerWeek: number;
-  createdAt: string;     // ISO date
+  createdAt: string;     
   weeks: ProgramWeek[];
 }
 
 export interface ProgramWeek {
-  number: number;        // 1-based week index
+  number: number;        
   days: ProgramDay[];
 }
 
 export interface ProgramDay {
   id: string;
-  name: string;          // e.g. "Push A", "Legs", "Full Body"
-  focus: string;         // e.g. "Chest & Triceps", "Lower body"
-  sessionDuration: string; // e.g. "60 min"
+  name: string;          
+  focus: string;         
+  sessionDuration: string; 
   exercises: Exercise[];   
 }
 
@@ -90,13 +95,13 @@ export interface ProgramDayProgressResult {
 
 export interface WorkoutSession {
   id: string;
-  planId?: string;       // For standalone plans
-  programId?: string;    // For programs
-  programDayId?: string; // For programs
+  planId?: string;       
+  programId?: string;    
+  programDayId?: string; 
   startTime: number;
   endTime?: number;
-  activeDuration?: number; // Net duration in seconds (excluding pauses)
-  exercises: Exercise[]; // Copies of exercises with user-inputted data
+  activeDuration?: number; 
+  exercises: Exercise[]; 
   status: 'active' | 'completed';
 }
 
@@ -119,7 +124,7 @@ export interface DailyStats {
   caloriesTarget: number;
   proteinConsumed: number;
   proteinTarget: number;
-  waterConsumed: number; // in 250ml increments
+  waterConsumed: number; 
   waterTarget: number;
   workoutsCompleted: number;
   streakDays: number;
@@ -133,15 +138,15 @@ export interface WeightEntry {
 export interface MeasurementEntry {
   id: string;
   date: string;
-  type: string; // 'Waist', 'Chest', 'Arms', etc.
+  type: string; 
   value: number;
   unit: string;
 }
 
 export interface WeightGoal {
   isActive: boolean;
-  startDate: string | null;   // ISO date (YYYY-MM-DD)
-  targetDate: string | null;  // ISO date (YYYY-MM-DD)
+  startDate: string | null;   
+  targetDate: string | null;  
   startWeight: number | null;
   targetWeight: number | null;
 }
@@ -155,19 +160,26 @@ export interface UserProfile {
   subscription: 'Free' | 'Premium';
 }
 
-export type ViewState = 'DASHBOARD' | 'WORKOUTS' | 'BODY' | 'FOOD' | 'MORE';
+export type ViewState = 
+    'DASHBOARD' | 
+    'WORKOUTS' | 
+    'BODY' | 
+    'FOOD' | 
+    'MORE' | 
+    'EXERCISE_LIBRARY' |
+    'EXERCISE_DETAIL';
 
 // --- HISTORY & PR TRACKING ---
 
 export interface CompletedWorkout {
   id: string;
-  completedAt: string; // ISO timestamp
+  completedAt: string; 
   session: WorkoutSession;
   summary: {
     name: string;
     totalExercises: number;
     totalSets: number;
-    estimatedVolume?: number; // sum(weight * reps) where possible
+    estimatedVolume?: number; 
     sourceType: 'PLAN' | 'PROGRAM_DAY' | 'AD_HOC';
     planId?: string;
     programId?: string;
@@ -177,7 +189,7 @@ export interface CompletedWorkout {
 
 export interface ExercisePerformanceEntry {
   id: string;
-  date: string;              // ISO date (yyyy-mm-dd)
+  date: string;              
   completedWorkoutId: string;
   exerciseName: string;
   targetMuscle?: string;
@@ -211,17 +223,17 @@ export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
 
 export interface FoodLogEntry {
   id: string;
-  date: string;       // ISO date: 'YYYY-MM-DD'
+  date: string;       
   time?: string;
   mealType: MealType;
   name: string;
   calories: number;
   protein: number;
-  carbs?: number;     // Optional for backward compatibility
-  fats?: number;      // Optional for backward compatibility
+  carbs?: number;     
+  fats?: number;      
   source?: 'MANUAL' | 'RECIPE' | 'DATABASE';
   recipeId?: string;
-  fdcId?: number;     // USDA FoodData Central ID
+  fdcId?: number;     
 }
 
 export interface MacroTargets {
@@ -232,12 +244,12 @@ export interface MacroTargets {
 }
 
 export interface SearchableFoodItem {
-  id: number;         // FDC ID
+  id: number;         
   name: string;
-  calories: number;   // kcal
-  protein: number;    // g
-  carbs: number;      // g
-  fats: number;       // g
+  calories: number;   
+  protein: number;    
+  carbs: number;      
+  fats: number;       
   brand?: string;
   servingSize?: number;
   servingUnit?: string;
@@ -246,7 +258,7 @@ export interface SearchableFoodItem {
 // --- PROGRESS TRACKING ---
 
 export interface TimeSeriesDataPoint {
-  date: string; // YYYY-MM-DD
+  date: string; 
   value: number;
 }
 

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, WorkoutSession, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, MealType, WeightGoal, MacroTargets, Exercise } from './types';
 import { Navigation } from './components/Navigation';
@@ -8,6 +7,8 @@ import { WorkoutsView } from './views/WorkoutsView';
 import { FoodView } from './views/FoodView';
 import { BodyView } from './views/BodyView';
 import { MoreView } from './views/MoreView';
+import { ExerciseLibraryScreen } from './views/Exercise/ExerciseLibraryScreen';
+import { ExerciseDetailScreen } from './views/Exercise/ExerciseDetailScreen';
 import { ArrowLeft } from 'lucide-react';
 import { usePersistentState } from './hooks/usePersistentState';
 import { DEFAULT_EXERCISES } from './services/DataService';
@@ -15,6 +16,9 @@ import { DEFAULT_EXERCISES } from './services/DataService';
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [history, setHistory] = useState<ViewState[]>(['DASHBOARD']);
+  
+  // Navigation State for Detail Views
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 
   // --- GLOBAL NAVIGATION HANDLERS ---
   const handleNavigate = (view: ViewState) => {
@@ -281,6 +285,31 @@ const App: React.FC = () => {
             onCompleteSession={handleCompleteSession}
             completedWorkouts={completedWorkouts}
             exerciseHistory={exerciseHistory}
+            onNavigate={handleNavigate}
+          />
+        );
+      case 'EXERCISE_LIBRARY':
+        return (
+          <ExerciseLibraryScreen
+            exercises={fullExerciseLibrary}
+            history={exerciseHistory}
+            onSelectExercise={(ex) => {
+              setSelectedExercise(ex);
+              handleNavigate('EXERCISE_DETAIL');
+            }}
+            onBack={handleBack}
+          />
+        );
+      case 'EXERCISE_DETAIL':
+        if (!selectedExercise) {
+           handleNavigate('EXERCISE_LIBRARY');
+           return null;
+        }
+        return (
+          <ExerciseDetailScreen 
+            exercise={selectedExercise}
+            history={exerciseHistory}
+            onBack={handleBack}
           />
         );
       case 'BODY':

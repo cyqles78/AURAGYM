@@ -59,7 +59,7 @@ export const BodyView: React.FC<BodyViewProps> = ({
   }, [weightHistory]);
 
   // --- DATA PROCESSING: MEASUREMENTS ---
-  const groupedMeasurements = useMemo(() => {
+  const groupedMeasurements = useMemo<Record<string, MeasurementEntry[]>>(() => {
     const grouped: Record<string, MeasurementEntry[]> = {};
     measurements.forEach(m => {
         if (!grouped[m.type]) grouped[m.type] = [];
@@ -316,7 +316,8 @@ export const BodyView: React.FC<BodyViewProps> = ({
              {Object.keys(groupedMeasurements).length === 0 && (
                  <div className="p-6 text-center text-sm text-secondary">No measurements logged yet.</div>
              )}
-             {Object.entries(groupedMeasurements).map(([type, entries]) => {
+             {Object.entries(groupedMeasurements).map(([type, rawEntries]) => {
+                const entries = rawEntries as MeasurementEntry[];
                 const current = entries[entries.length - 1].value;
                 const start = entries[0].value;
                 const change = current - start;

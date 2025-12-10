@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { GlassCard } from '../components/GlassCard';
-import { WorkoutPlan, WorkoutSession, Program, ProgramDay, CompletedWorkout, ExercisePerformanceEntry, ProgramDayProgressRequest, ProgramDayProgressResult, Exercise } from '../types';
+import { WorkoutPlan, WorkoutSession, Program, ProgramDay, CompletedWorkout, ExercisePerformanceEntry, ProgramDayProgressRequest, ProgramDayProgressResult, Exercise, ViewState } from '../types';
 import { generateAIWorkout, generateAIProgram, ProgramContextInput, generateProgressedProgramDay } from '../services/geminiService';
-import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calendar, Layers, ChevronDown, History, Trophy, TrendingUp, AlertCircle, X, Dumbbell, Hammer } from 'lucide-react';
+import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calendar, Layers, ChevronDown, History, Trophy, TrendingUp, AlertCircle, X, Dumbbell, Hammer, BookOpen } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, Cell, XAxis, YAxis, AreaChart, Area, Tooltip, CartesianGrid } from 'recharts';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 import { WorkoutBuilderView } from './WorkoutBuilderView';
@@ -20,6 +20,7 @@ interface WorkoutsViewProps {
   onCompleteSession: (completedWorkout: CompletedWorkout, performanceEntries: ExercisePerformanceEntry[]) => void;
   completedWorkouts: CompletedWorkout[];
   exerciseHistory: ExercisePerformanceEntry[];
+  onNavigate: (view: ViewState) => void;
 }
 
 type WorkoutsMode = 'LIST' | 'GENERATOR' | 'ACTIVE_SESSION' | 'CREATE_PLAN' | 'PROGRAM_BUILDER' | 'PROGRAM_DETAIL' | 'BUILDER' | 'SUMMARY';
@@ -50,7 +51,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     onAddCustomExercise,
     onCompleteSession, 
     completedWorkouts = [], 
-    exerciseHistory = [] 
+    exerciseHistory = [],
+    onNavigate
 }) => {
   const [viewMode, setViewMode] = useState<WorkoutsMode>('LIST');
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
@@ -968,6 +970,12 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     <div className="pb-28 pt-6 space-y-8">
       <div className="flex justify-between items-center px-1">
         <h1 className="text-3xl font-bold text-white tracking-tight">Workouts</h1>
+        <button
+            onClick={() => onNavigate('EXERCISE_LIBRARY')}
+            className="flex items-center gap-1 bg-white text-black px-3 py-1.5 rounded-full text-xs font-bold hover:bg-gray-200 transition shadow-sm"
+        >
+            <BookOpen size={12} /> Library
+        </button>
       </div>
 
       {/* Analytics Section */}
