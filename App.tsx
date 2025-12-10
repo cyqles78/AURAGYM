@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, WorkoutSession, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, MealType, WeightGoal, MacroTargets, Exercise } from './types';
 import { Navigation } from './components/Navigation';
 import { DashboardView } from './views/DashboardView';
@@ -12,32 +11,19 @@ import { ExerciseDetailScreen } from './views/Exercise/ExerciseDetailScreen';
 import { ArrowLeft } from 'lucide-react';
 import { usePersistentState } from './hooks/usePersistentState';
 import { DEFAULT_EXERCISES } from './services/DataService';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthScreen } from './views/Auth/AuthScreen';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [history, setHistory] = useState<ViewState[]>(['DASHBOARD']);
   
   // Navigation State for Detail Views
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 
-  // --- GLOBAL NAVIGATION HANDLERS ---
-  const handleNavigate = (view: ViewState) => {
-    if (view === currentView) return;
-    setHistory(prev => [...prev, view]);
-    setCurrentView(view);
-  };
-
-  const handleBack = () => {
-    if (history.length <= 1) return;
-    const newHistory = [...history];
-    newHistory.pop(); // Remove current
-    const prevView = newHistory[newHistory.length - 1];
-    setHistory(newHistory);
-    setCurrentView(prevView);
-  };
-
   // --- STATE (PERSISTED) ---
-  const [user, setUser] = usePersistentState<UserProfile>('auragym_user_profile', {
+  const [userProfile, setUserProfile] = usePersistentState<UserProfile>('auragym_user_profile', {
     name: 'Alex Lifter',
     level: 12,
     xp: 2450,
@@ -153,6 +139,26 @@ const App: React.FC = () => {
     'auragym_exercise_history',
     []
   );
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  // --- GLOBAL NAVIGATION HANDLERS ---
+  const handleNavigate = (view: ViewState) => {
+    if (view === currentView) return;
+    setHistory(prev => [...prev, view]);
+    setCurrentView(view);
+  };
+
+  const handleBack = () => {
+    if (history.length <= 1) return;
+    const newHistory = [...history];
+    newHistory.pop(); // Remove current
+    const prevView = newHistory[newHistory.length - 1];
+    setHistory(newHistory);
+    setCurrentView(prevView);
+  };
 
   // --- HELPERS ---
 
@@ -363,8 +369,8 @@ const App: React.FC = () => {
       case 'MORE':
         return (
           <MoreView 
-            user={user} 
-            onUpdateUser={setUser} 
+            user={userProfile} 
+            onUpdateUser={setUserProfile} 
           />
         );
       default:
@@ -395,6 +401,14 @@ const App: React.FC = () => {
       <Navigation currentView={currentView} setView={handleNavigate} />
 
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
