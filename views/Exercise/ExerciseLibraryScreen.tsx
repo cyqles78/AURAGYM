@@ -170,7 +170,7 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
                             </div>
                         </div>
                         
-                        {/* Edit Button (Absolute) - only show on hover for desktop, or make it distinct */}
+                        {/* Edit Button (Absolute) */}
                         <button 
                             onClick={(e) => handleEditClick(e, ex)}
                             className="absolute right-2 top-2 p-2 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Exercise, ExercisePerformanceEntry } from '../../types';
-import { ArrowLeft, Play, Trophy, BarChart2, BookOpen, Clock, Dumbbell, AlertCircle, Activity, Target, Edit2 } from 'lucide-react';
+import { ArrowLeft, Play, Trophy, BarChart2, BookOpen, Clock, Dumbbell, AlertCircle, Activity, Target, Edit2, ExternalLink } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { GlassCard } from '../../components/GlassCard';
 import { ExerciseEditModal } from '../../components/ExerciseEditModal';
@@ -24,28 +24,24 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
   const [activeTab, setActiveTab] = useState<'STATS' | 'GUIDE' | 'HISTORY'>('STATS');
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // --- HELPERS ---
-  const getEmbedUrl = (inputUrl?: string) => {
-      if (!inputUrl) return null;
-      
-      try {
-          // Robust Regex for YouTube ID extraction (Handles shorts, youtu.be, watch?v=, embed/, etc)
-          const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
-          const match = inputUrl.match(regExp);
-
-          if (match && match[2].length === 11) {
-              // Construct clean embed URL with parameters to prevent player errors and unwanted behavior
-              return `https://www.youtube.com/embed/${match[2]}?rel=0&modestbranding=1&playsinline=1&controls=1`;
-          }
-          
-          return inputUrl; // Fallback for non-YouTube or already valid URLs
-      } catch (e) {
-          console.warn("Failed to parse video URL", e);
-          return inputUrl;
-      }
+  // --- VIDEO LOGIC (Thumbnail Strategy) ---
+  const getVideoId = (url?: string) => {
+      if (!url) return null;
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  const embedUrl = getEmbedUrl(exercise.videoUrl);
+  const videoId = getVideoId(exercise.videoUrl);
+  const thumbnailUrl = videoId 
+    ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` 
+    : null;
+
+  const handlePlayVideo = () => {
+      if (exercise.videoUrl) {
+          window.open(exercise.videoUrl, '_blank', 'noopener,noreferrer');
+      }
+  };
 
   // --- ANALYTICS ---
   const stats = useMemo(() => {
@@ -54,7 +50,6 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
       let totalReps = 0;
       const chartData: any[] = [];
 
-      // Sort history chronologically
       const sortedHistory = [...history].filter(h => h.exerciseName === exercise.name).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       sortedHistory.forEach(entry => {
@@ -65,7 +60,6 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
               const w = s.weight || 0;
               const r = s.reps || 0;
               if (w > 0 && r > 0) {
-                  // Epley
                   const e1rm = w * (1 + r/30);
                   if (e1rm > dailyMax1RM) dailyMax1RM = e1rm;
                   dailyVol += w * r;
@@ -102,15 +96,27 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
           </div>
 
           <div className="h-64 w-full bg-[#1C1C1E] border-b border-[#2C2C2E] relative flex flex-col items-center justify-center overflow-hidden group">
-              {embedUrl ? (
-                  <iframe 
-                    src={embedUrl} 
-                    title={exercise.name} 
-                    className="w-full h-full object-cover" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    referrerPolicy="no-referrer"
-                  />
+              {thumbnailUrl ? (
+                  <>
+                    <img 
+                        src={thumbnailUrl} 
+                        alt={exercise.name} 
+                        className="w-full h-full object-cover opacity-60"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                        <button 
+                            onClick={handlePlayVideo}
+                            className="h-16 w-16 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white hover:scale-110 transition-transform active:scale-95"
+                        >
+                            <Play size={32} fill="white" className="ml-1" />
+                        </button>
+                    </div>
+                    <div className="absolute bottom-4 right-4 z-10">
+                        <span className="flex items-center gap-1 text-[10px] font-bold bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-lg border border-white/10">
+                            <ExternalLink size={10} /> Watch on YouTube
+                        </span>
+                    </div>
+                  </>
               ) : (
                   <div className="flex flex-col items-center opacity-30">
                       <Dumbbell size={64} className="mb-4 text-white" />
@@ -118,22 +124,17 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
                   </div>
               )}
               
-              {/* Overlay Gradient (Only if no video) */}
-              {!embedUrl && <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80"></div>}
-
-              {/* Info Overlay (Visible if no video, or below video) */}
-              {!embedUrl && (
-                  <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
-                      <div>
-                          {exercise.mechanic && (
-                              <span className="text-[10px] font-bold text-accentBlue bg-accentBlue/10 px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">
-                                  {exercise.mechanic}
-                              </span>
-                          )}
-                          <h1 className="text-3xl font-black text-white leading-none">{exercise.name}</h1>
-                      </div>
+              {/* Info Overlay */}
+              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
+                  <div>
+                      {exercise.mechanic && (
+                          <span className="text-[10px] font-bold text-accentBlue bg-accentBlue/10 px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider backdrop-blur-md border border-accentBlue/20">
+                              {exercise.mechanic}
+                          </span>
+                      )}
+                      <h1 className="text-3xl font-black text-white leading-none drop-shadow-lg">{exercise.name}</h1>
                   </div>
-              )}
+              </div>
           </div>
           
           <div className="p-4 bg-[#1C1C1E] flex items-center gap-4 border-b border-white/5 overflow-x-auto no-scrollbar">
@@ -173,7 +174,6 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
       
       {activeTab === 'STATS' && (
           <div className="px-4 space-y-4 animate-in slide-in-from-bottom-2 fade-in duration-300 pb-20">
-              {/* Record Cards */}
               <div className="grid grid-cols-3 gap-3">
                   <GlassCard className="!p-3 flex flex-col items-center justify-center gap-1 border-yellow-500/20 bg-yellow-500/5">
                       <Trophy size={16} className="text-yellow-500 mb-1" />
@@ -194,7 +194,6 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
                   </GlassCard>
               </div>
 
-              {/* Chart */}
               <GlassCard>
                   <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
                       <TrendingUpIcon /> Strength Progression (1RM)
@@ -297,11 +296,13 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({
           <ExerciseEditModal 
             exercise={exercise}
             onClose={() => setShowEditModal(false)}
-            onSave={(updatedEx) => onUpdateExercise && onUpdateExercise(updatedEx)}
+            onSave={(updatedEx) => {
+                if (onUpdateExercise) onUpdateExercise(updatedEx);
+            }}
             onDelete={(id) => {
                 if (onDeleteExercise) {
                     onDeleteExercise(id);
-                    onBack(); // Go back to library after delete
+                    onBack();
                 }
             }}
           />

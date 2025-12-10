@@ -43,8 +43,8 @@ export const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // --- SYNC STATE ON OPEN ---
-  // This ensures that when the modal is reused or re-opened with a different exercise,
-  // the internal state is correctly reset to the new exercise's values.
+  // This useEffect ensures that when the modal is opened with a new exercise prop,
+  // all form fields are reset to that exercise's values immediately.
   useEffect(() => {
     if (exercise) {
         setName(exercise.name);
