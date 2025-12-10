@@ -1,14 +1,18 @@
 
 import React, { useState, useMemo } from 'react';
-import { Exercise, ExercisePerformanceEntry } from '../../types';
-import { Search, Filter, Trophy, ChevronRight, Dumbbell, Activity, Medal } from 'lucide-react';
+import { Exercise, ExercisePerformanceEntry, MUSCLE_GROUPS, EQUIPMENT_TYPES, TargetMuscle, Equipment } from '../../types';
+import { Search, Filter, Trophy, ChevronRight, Dumbbell, Activity, Medal, Plus, Edit2 } from 'lucide-react';
 import { GlassCard } from '../../components/GlassCard';
+import { ExerciseEditModal } from '../../components/ExerciseEditModal';
 
 interface ExerciseLibraryScreenProps {
-  exercises: Exercise[]; // The full library
-  history: ExercisePerformanceEntry[]; // For mastery calculation
+  exercises: Exercise[]; 
+  history: ExercisePerformanceEntry[]; 
   onSelectExercise: (exercise: Exercise) => void;
   onBack: () => void;
+  onAddCustomExercise?: (exercise: Exercise) => void;
+  onUpdateExercise?: (exercise: Exercise) => void;
+  onDeleteExercise?: (exerciseId: string) => void;
 }
 
 type MasteryLevel = 'Novice' | 'Regular' | 'Pro' | 'Elite';
@@ -17,15 +21,20 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
   exercises, 
   history, 
   onSelectExercise,
-  onBack 
+  onBack,
+  onAddCustomExercise,
+  onUpdateExercise,
+  onDeleteExercise
 }) => {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [filterType, setFilterType] = useState<'Muscle' | 'Equipment'>('Muscle');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<Exercise | undefined>(undefined);
 
   // --- FILTERS ---
-  const muscles = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
-  const equipment = ['All', 'Barbell', 'Dumbbells', 'Machine', 'Cable', 'Bodyweight'];
+  const muscles = ['All', ...MUSCLE_GROUPS];
+  const equipment = ['All', ...EQUIPMENT_TYPES];
 
   // --- MASTERY LOGIC ---
   const getMastery = (exerciseName: string): { level: MasteryLevel; count: number; color: string } => {
@@ -44,18 +53,42 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
       const matchesFilter = activeFilter === 'All' 
         ? true 
         : filterType === 'Muscle' 
-          ? ex.targetMuscle.includes(activeFilter) || ex.targetMuscle === activeFilter
-          : ex.equipment.includes(activeFilter) || ex.equipment === activeFilter;
+          ? ex.targetMuscle === activeFilter
+          : ex.equipment === activeFilter;
       
       return matchesSearch && matchesFilter;
     });
   }, [exercises, search, activeFilter, filterType]);
 
+  const handleEditClick = (e: React.MouseEvent, ex: Exercise) => {
+      e.stopPropagation();
+      setEditingExercise(ex);
+      setShowEditModal(true);
+  };
+
+  const handleSave = (ex: Exercise) => {
+      if (editingExercise) {
+          // Update Mode
+          onUpdateExercise && onUpdateExercise(ex);
+      } else {
+          // Create Mode
+          onAddCustomExercise && onAddCustomExercise(ex);
+      }
+  };
+
   return (
-    <div className="pb-28 pt-6 space-y-6 animate-in slide-in-from-right h-screen flex flex-col">
+    <div className="pb-28 pt-6 space-y-6 animate-in slide-in-from-right h-screen flex flex-col relative">
       {/* Header */}
       <div className="px-1 flex-shrink-0">
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-4">Encyclopedia</h1>
+        <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold text-white tracking-tight">Encyclopedia</h1>
+            <button 
+                onClick={() => { setEditingExercise(undefined); setShowEditModal(true); }}
+                className="bg-white text-black p-2 rounded-full hover:bg-gray-200 transition active:scale-90 shadow-lg"
+            >
+                <Plus size={20} />
+            </button>
+        </div>
         
         {/* Search Bar */}
         <div className="relative mb-4">
@@ -112,7 +145,7 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
                   return (
                     <GlassCard 
                         key={ex.id} 
-                        className="!p-4 active:scale-[0.99] transition-transform cursor-pointer group border-l-4"
+                        className="!p-4 active:scale-[0.99] transition-transform cursor-pointer group border-l-4 relative"
                         style={{ borderLeftColor: mastery.level === 'Elite' ? '#FACC15' : mastery.level === 'Pro' ? '#22D3EE' : 'transparent' }}
                         onClick={() => onSelectExercise(ex)}
                     >
@@ -136,6 +169,14 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
                                 <span className="text-[10px] text-slate-600">{mastery.count} sets</span>
                             </div>
                         </div>
+                        
+                        {/* Edit Button (Absolute) - only show on hover for desktop, or make it distinct */}
+                        <button 
+                            onClick={(e) => handleEditClick(e, ex)}
+                            className="absolute right-2 top-2 p-2 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Edit2 size={14} />
+                        </button>
                     </GlassCard>
                   );
               })}
@@ -148,6 +189,16 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
               )}
           </div>
       </div>
+
+      {/* Editor Modal */}
+      {showEditModal && (
+          <ExerciseEditModal 
+            exercise={editingExercise}
+            onClose={() => setShowEditModal(false)}
+            onSave={handleSave}
+            onDelete={onDeleteExercise}
+          />
+      )}
     </div>
   );
 };

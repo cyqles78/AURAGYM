@@ -1,20 +1,51 @@
 
+// --- STRICT CONSTANTS (For UI Generation) ---
+export const MUSCLE_GROUPS = [
+  'Chest', 'Back', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 
+  'Shoulders', 'Triceps', 'Biceps', 'Forearms', 'Abs', 'Cardio', 'Full Body', 'Other'
+] as const;
+
+export const EQUIPMENT_TYPES = [
+  'Barbell', 'Dumbbell', 'Machine', 'Cable', 'Bodyweight', 
+  'Kettlebell', 'Band', 'Smith Machine', 'Cardio Machine', 'Other'
+] as const;
+
+export const MECHANIC_TYPES = ['Compound', 'Isolation', 'N/A'] as const;
+export const FORCE_TYPES = ['Push', 'Pull', 'Static', 'N/A'] as const;
+export const DIFFICULTY_LEVELS = ['Beginner', 'Intermediate', 'Advanced'] as const;
+
+// --- DERIVED TYPES ---
+export type TargetMuscle = typeof MUSCLE_GROUPS[number];
+export type Equipment = typeof EQUIPMENT_TYPES[number];
+export type Mechanic = typeof MECHANIC_TYPES[number];
+export type Force = typeof FORCE_TYPES[number];
+export type Difficulty = typeof DIFFICULTY_LEVELS[number];
+
 export interface Exercise {
   id: string;
   name: string;
-  targetMuscle: string;
-  equipment: string;
-  sets: WorkoutSet[];
+  targetMuscle: TargetMuscle;
+  equipment: Equipment;
+  
+  // Classification
+  mechanic?: Mechanic;
+  force?: Force;
+  difficulty?: Difficulty;
+  secondaryMuscles?: TargetMuscle[];
+  
+  // Instructions & Media
+  instructions?: string[]; // Array of steps or single block text split by newline
   notes?: string;
-  restTimeSeconds: number; 
   videoUrl?: string; 
+  
+  // Execution Defaults
+  sets: WorkoutSet[]; // Default template sets
+  restTimeSeconds: number; 
   supersetId?: string; 
   
-  // Encyclopedia Fields
-  instructions?: string[];
-  secondaryMuscles?: string[];
-  difficulty?: 'Beginner' | 'Intermediate' | 'Advanced';
-  mechanic?: 'Compound' | 'Isolation';
+  // System Flags
+  isCustom?: boolean; // If true, user can delete it
+  isDeleted?: boolean; // Soft delete flag
 }
 
 export interface WorkoutSet {
@@ -30,7 +61,7 @@ export interface WorkoutPlan {
   id: string;
   title: string;
   duration: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  difficulty: Difficulty;
   exercises: Exercise[];
   tags: string[];
   description?: string;

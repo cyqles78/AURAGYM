@@ -1,49 +1,51 @@
 
 import React, { useState, useMemo } from 'react';
 import { Exercise, ExercisePerformanceEntry } from '../../types';
-import { MuscleHeatmap } from '../../components/Body/MuscleHeatmap';
-import { MuscleStatus } from '../../hooks/useRecoveryStatus';
-import { ArrowLeft, Play, Trophy, BarChart2, BookOpen, Clock, Dumbbell, AlertCircle, Activity } from 'lucide-react';
+import { ArrowLeft, Play, Trophy, BarChart2, BookOpen, Clock, Dumbbell, AlertCircle, Activity, Target, Edit2 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { GlassCard } from '../../components/GlassCard';
+import { ExerciseEditModal } from '../../components/ExerciseEditModal';
 
 interface ExerciseDetailScreenProps {
   exercise: Exercise;
   history: ExercisePerformanceEntry[];
   onBack: () => void;
+  onUpdateExercise?: (exercise: Exercise) => void;
+  onDeleteExercise?: (exerciseId: string) => void;
 }
 
-export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({ exercise, history, onBack }) => {
+export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({ 
+  exercise, 
+  history, 
+  onBack,
+  onUpdateExercise,
+  onDeleteExercise
+}) => {
   const [activeTab, setActiveTab] = useState<'STATS' | 'GUIDE' | 'HISTORY'>('STATS');
+  const [showEditModal, setShowEditModal] = useState(false);
 
-  // --- BIOMETRICS ---
-  // Synthesize a muscle status map to highlight ONLY the target muscles
-  const targetMap = useMemo(() => {
-      const map: Record<string, MuscleStatus> = {};
+  // --- HELPERS ---
+  const getEmbedUrl = (inputUrl?: string) => {
+      if (!inputUrl) return null;
       
-      // Primary -> FATIGUED color (Red/Hot) to indicate focus
-      map[exercise.targetMuscle] = { 
-          name: exercise.targetMuscle, 
-          status: 'FATIGUED', 
-          fatigueLevel: 100, 
-          recoveryPercentage: 0, 
-          color: '#ef4444' 
-      };
+      try {
+          // Robust Regex for YouTube ID extraction (Handles shorts, youtu.be, watch?v=, embed/, etc)
+          const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
+          const match = inputUrl.match(regExp);
 
-      // Secondaries -> RECOVERING color (Orange)
-      if (exercise.secondaryMuscles) {
-          exercise.secondaryMuscles.forEach(m => {
-              map[m] = { 
-                  name: m, 
-                  status: 'RECOVERING', 
-                  fatigueLevel: 50, 
-                  recoveryPercentage: 50, 
-                  color: '#f59e0b' 
-              };
-          });
+          if (match && match[2].length === 11) {
+              // Construct clean embed URL with parameters to prevent player errors and unwanted behavior
+              return `https://www.youtube.com/embed/${match[2]}?rel=0&modestbranding=1&playsinline=1&controls=1`;
+          }
+          
+          return inputUrl; // Fallback for non-YouTube or already valid URLs
+      } catch (e) {
+          console.warn("Failed to parse video URL", e);
+          return inputUrl;
       }
-      return map;
-  }, [exercise]);
+  };
+
+  const embedUrl = getEmbedUrl(exercise.videoUrl);
 
   // --- ANALYTICS ---
   const stats = useMemo(() => {
@@ -90,51 +92,65 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({ exer
       
       {/* --- HERO HEADER --- */}
       <div className="relative">
-          <div className="absolute top-0 left-0 right-0 z-20 flex items-center p-4">
+          <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4">
               <button onClick={onBack} className="p-2 bg-black/50 backdrop-blur-md rounded-full text-white border border-white/10 hover:bg-white/10 transition">
                   <ArrowLeft size={20} />
               </button>
+              <button onClick={() => setShowEditModal(true)} className="p-2 bg-black/50 backdrop-blur-md rounded-full text-white border border-white/10 hover:bg-white/10 transition">
+                  <Edit2 size={20} />
+              </button>
           </div>
 
-          <div className="grid grid-cols-2 h-64 w-full">
-              {/* Left: Video Placeholder */}
-              <div className="bg-[#1C1C1E] border-r border-[#2C2C2E] relative flex flex-col items-center justify-center overflow-hidden group">
-                  {exercise.videoUrl ? (
-                      <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
-                          <Play size={32} className="text-white fill-white opacity-80" />
-                          {/* Real app would embed video here */}
-                      </div>
-                  ) : (
-                      <div className="flex flex-col items-center opacity-30">
-                          <Dumbbell size={40} className="mb-2 text-white" />
-                          <span className="text-[10px] font-bold text-white uppercase tracking-widest">No Video</span>
-                      </div>
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
-                      <span className="text-xs font-bold text-white uppercase bg-white/20 px-2 py-1 rounded backdrop-blur-md">{exercise.mechanic || 'Compound'}</span>
+          <div className="h-64 w-full bg-[#1C1C1E] border-b border-[#2C2C2E] relative flex flex-col items-center justify-center overflow-hidden group">
+              {embedUrl ? (
+                  <iframe 
+                    src={embedUrl} 
+                    title={exercise.name} 
+                    className="w-full h-full object-cover" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    referrerPolicy="no-referrer"
+                  />
+              ) : (
+                  <div className="flex flex-col items-center opacity-30">
+                      <Dumbbell size={64} className="mb-4 text-white" />
+                      <span className="text-xs font-bold text-white uppercase tracking-[0.2em]">Video Unavailable</span>
                   </div>
-              </div>
+              )}
+              
+              {/* Overlay Gradient (Only if no video) */}
+              {!embedUrl && <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80"></div>}
 
-              {/* Right: Biometric Map */}
-              <div className="bg-[#101214] relative overflow-hidden">
-                  <div className="absolute inset-0 opacity-80">
-                      <MuscleHeatmap statusMap={targetMap} />
+              {/* Info Overlay (Visible if no video, or below video) */}
+              {!embedUrl && (
+                  <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+                      <div>
+                          {exercise.mechanic && (
+                              <span className="text-[10px] font-bold text-accentBlue bg-accentBlue/10 px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">
+                                  {exercise.mechanic}
+                              </span>
+                          )}
+                          <h1 className="text-3xl font-black text-white leading-none">{exercise.name}</h1>
+                      </div>
                   </div>
-                  <div className="absolute bottom-2 right-2 flex flex-col items-end pointer-events-none">
-                      <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">{exercise.targetMuscle}</span>
-                      {exercise.secondaryMuscles && (
-                          <span className="text-[9px] font-bold text-orange-500 uppercase tracking-wider opacity-80">{exercise.secondaryMuscles[0]}</span>
-                      )}
-                  </div>
-              </div>
+              )}
           </div>
           
-          <div className="p-4 border-b border-white/10 bg-[#1C1C1E]">
-              <h1 className="text-2xl font-bold text-white mb-1">{exercise.name}</h1>
-              <div className="flex items-center gap-3 text-xs text-slate-400">
-                  <span className="bg-white/5 px-2 py-1 rounded border border-white/5">{exercise.equipment}</span>
-                  <span className="bg-white/5 px-2 py-1 rounded border border-white/5">{exercise.difficulty || 'Intermediate'}</span>
+          <div className="p-4 bg-[#1C1C1E] flex items-center gap-4 border-b border-white/5 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surfaceHighlight border border-white/5 whitespace-nowrap">
+                  <Target size={14} className="text-red-400" />
+                  <span className="text-xs font-bold text-white">{exercise.targetMuscle}</span>
               </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surfaceHighlight border border-white/5 whitespace-nowrap">
+                  <Dumbbell size={14} className="text-secondary" />
+                  <span className="text-xs font-bold text-white">{exercise.equipment}</span>
+              </div>
+              {exercise.difficulty && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surfaceHighlight border border-white/5 whitespace-nowrap">
+                      <Activity size={14} className="text-yellow-500" />
+                      <span className="text-xs font-bold text-white">{exercise.difficulty}</span>
+                  </div>
+              )}
           </div>
       </div>
 
@@ -156,7 +172,7 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({ exer
       {/* --- TAB CONTENT --- */}
       
       {activeTab === 'STATS' && (
-          <div className="px-4 space-y-4 animate-in slide-in-from-bottom-2 fade-in duration-300">
+          <div className="px-4 space-y-4 animate-in slide-in-from-bottom-2 fade-in duration-300 pb-20">
               {/* Record Cards */}
               <div className="grid grid-cols-3 gap-3">
                   <GlassCard className="!p-3 flex flex-col items-center justify-center gap-1 border-yellow-500/20 bg-yellow-500/5">
@@ -200,7 +216,7 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({ exer
                       </div>
                   ) : (
                       <div className="h-32 flex flex-col items-center justify-center text-slate-500 border border-dashed border-white/10 rounded-xl">
-                          <p className="text-xs">Not enough data for chart.</p>
+                          <p className="text-xs">Log more workouts to see charts.</p>
                       </div>
                   )}
               </GlassCard>
@@ -224,16 +240,19 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({ exer
                       <div className="flex flex-col items-center py-8 text-slate-500">
                           <AlertCircle size={32} className="mb-2 opacity-50" />
                           <p className="text-xs">No specific instructions available.</p>
+                          <button onClick={() => setShowEditModal(true)} className="mt-2 text-accentBlue text-xs font-bold hover:underline">Add Instructions</button>
                       </div>
                   )}
               </GlassCard>
 
-              <GlassCard className="bg-gradient-to-br from-blue-900/20 to-transparent border-blue-500/20">
-                  <h3 className="text-sm font-bold text-blue-400 mb-2 uppercase tracking-wide">Pro Tip</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed italic">
-                      "Focus on a slow eccentric phase (2-3 seconds) to maximize muscle fiber recruitment and time under tension."
-                  </p>
-              </GlassCard>
+              {exercise.notes && (
+                  <GlassCard className="bg-gradient-to-br from-blue-900/20 to-transparent border-blue-500/20">
+                      <h3 className="text-sm font-bold text-blue-400 mb-2 uppercase tracking-wide">Notes</h3>
+                      <p className="text-sm text-slate-300 leading-relaxed italic">
+                          "{exercise.notes}"
+                      </p>
+                  </GlassCard>
+              )}
           </div>
       )}
 
@@ -271,6 +290,21 @@ export const ExerciseDetailScreen: React.FC<ExerciseDetailScreenProps> = ({ exer
                   ))
               )}
           </div>
+      )}
+
+      {/* Editor Modal */}
+      {showEditModal && (
+          <ExerciseEditModal 
+            exercise={exercise}
+            onClose={() => setShowEditModal(false)}
+            onSave={(updatedEx) => onUpdateExercise && onUpdateExercise(updatedEx)}
+            onDelete={(id) => {
+                if (onDeleteExercise) {
+                    onDeleteExercise(id);
+                    onBack(); // Go back to library after delete
+                }
+            }}
+          />
       )}
 
     </div>

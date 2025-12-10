@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, AlertCircle } from 'lucide-react';
 import { suggestExerciseDetails } from '../services/geminiService';
-import { Exercise } from '../types';
+import { Exercise, TargetMuscle, Equipment } from '../types';
 
 interface ExerciseCreationModalProps {
   onClose: () => void;
@@ -28,8 +28,8 @@ export const ExerciseCreationModal: React.FC<ExerciseCreationModalProps> = ({ on
     const suggestion = await suggestExerciseDetails(name);
     
     if (suggestion) {
-        setTargetMuscle(suggestion.targetMuscle);
-        setEquipment(suggestion.equipment);
+        setTargetMuscle(suggestion.targetMuscle as TargetMuscle);
+        setEquipment(suggestion.equipment as Equipment);
     } else {
         setError("AI couldn't find details for this exercise. Please enter them manually.");
     }
@@ -45,8 +45,8 @@ export const ExerciseCreationModal: React.FC<ExerciseCreationModalProps> = ({ on
     const newExercise: Exercise = {
         id: `custom_${Date.now()}`,
         name,
-        targetMuscle,
-        equipment: equipment || 'None',
+        targetMuscle: targetMuscle as TargetMuscle,
+        equipment: (equipment || 'None') as Equipment,
         videoUrl,
         sets: [], // Empty sets for template
         restTimeSeconds: 60,

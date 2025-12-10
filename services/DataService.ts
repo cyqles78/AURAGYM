@@ -1,112 +1,198 @@
 
-
 import { WeightEntry, CompletedWorkout, Exercise } from '../types';
 
 // Default Library Exercises
+// Note: We use strict types matching the constants in types.ts
 export const DEFAULT_EXERCISES: Exercise[] = [
-  { id: 'def_1', name: 'Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 120, sets: [] },
-  { id: 'def_2', name: 'Squat', targetMuscle: 'Legs', equipment: 'Barbell', restTimeSeconds: 180, sets: [] },
-  { id: 'def_3', name: 'Deadlift', targetMuscle: 'Back', equipment: 'Barbell', restTimeSeconds: 180, sets: [] },
-  { id: 'def_4', name: 'Overhead Press', targetMuscle: 'Shoulders', equipment: 'Barbell', restTimeSeconds: 120, sets: [] },
-  { id: 'def_5', name: 'Dumbbell Row', targetMuscle: 'Back', equipment: 'Dumbbells', restTimeSeconds: 90, sets: [] },
-  { id: 'def_6', name: 'Pull Up', targetMuscle: 'Back', equipment: 'Bodyweight', restTimeSeconds: 90, sets: [] },
-  { id: 'def_7', name: 'Push Up', targetMuscle: 'Chest', equipment: 'Bodyweight', restTimeSeconds: 60, sets: [] },
-  { id: 'def_8', name: 'Dumbbell Curl', targetMuscle: 'Biceps', equipment: 'Dumbbells', restTimeSeconds: 60, sets: [] },
-  { id: 'def_9', name: 'Tricep Extension', targetMuscle: 'Triceps', equipment: 'Cable', restTimeSeconds: 60, sets: [] },
-  { id: 'def_10', name: 'Leg Press', targetMuscle: 'Legs', equipment: 'Machine', restTimeSeconds: 120, sets: [] },
-  { id: 'def_11', name: 'Lat Pulldown', targetMuscle: 'Back', equipment: 'Cable', restTimeSeconds: 90, sets: [] },
-  { id: 'def_12', name: 'Lateral Raise', targetMuscle: 'Shoulders', equipment: 'Dumbbells', restTimeSeconds: 60, sets: [] },
-];
-
-// Mock Data
-const MOCK_WEIGHT_HISTORY: WeightEntry[] = [
-  { date: '2023-01-01', weight: 85.0 },
-  { date: '2023-02-01', weight: 84.2 },
-  { date: '2023-03-01', weight: 83.5 },
-  { date: '2023-04-01', weight: 82.8 },
-  { date: '2023-05-01', weight: 83.1 },
-  { date: '2023-06-01', weight: 82.5 },
-  { date: '2023-07-01', weight: 81.8 },
-  { date: '2023-08-01', weight: 80.5 },
-];
-
-const MOCK_WORKOUT_LOGS: CompletedWorkout[] = [
-  {
-    id: 'w1',
-    completedAt: '2023-06-01T10:00:00Z',
-    session: {
-      id: 's1',
-      startTime: 0,
-      status: 'completed',
-      exercises: [
-        {
-          id: 'ex1', name: 'Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 90,
-          sets: [
-            { id: 'st1', reps: '10', weight: '60', completed: true },
-            { id: 'st2', reps: '10', weight: '60', completed: true }
-          ]
-        },
-        {
-          id: 'ex2', name: 'Squat', targetMuscle: 'Legs', equipment: 'Barbell', restTimeSeconds: 120,
-          sets: [
-            { id: 'st3', reps: '8', weight: '80', completed: true }
-          ]
-        }
-      ]
-    },
-    summary: { name: 'Upper Power', totalExercises: 2, totalSets: 3, sourceType: 'AD_HOC' }
+  // --- CHEST ---
+  { 
+    id: 'def_bench_press', 
+    name: 'Barbell Bench Press', 
+    targetMuscle: 'Chest', 
+    equipment: 'Barbell', 
+    mechanic: 'Compound', 
+    force: 'Push', 
+    difficulty: 'Intermediate',
+    instructions: ['Lie on bench', 'Lower bar to mid-chest', 'Press up explosively'], 
+    restTimeSeconds: 120, 
+    videoUrl: 'https://www.youtube.com/watch?v=rT7DgCr-3pg',
+    sets: [] 
   },
-  {
-    id: 'w2',
-    completedAt: '2023-06-05T10:00:00Z',
-    session: {
-      id: 's2',
-      startTime: 0,
-      status: 'completed',
-      exercises: [
-        {
-          id: 'ex1', name: 'Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 90,
-          sets: [
-            { id: 'st1', reps: '8', weight: '65', completed: true },
-            { id: 'st2', reps: '8', weight: '65', completed: true }
-          ]
-        }
-      ]
-    },
-    summary: { name: 'Upper Power', totalExercises: 1, totalSets: 2, sourceType: 'AD_HOC' }
+  { 
+    id: 'def_incline_db_press', 
+    name: 'Incline Dumbbell Press', 
+    targetMuscle: 'Chest', 
+    equipment: 'Dumbbell', 
+    mechanic: 'Compound', 
+    force: 'Push',
+    difficulty: 'Beginner',
+    restTimeSeconds: 90, 
+    videoUrl: 'https://www.youtube.com/watch?v=8iPEnn-ltC8',
+    sets: [] 
   },
-  {
-    id: 'w3',
-    completedAt: '2023-06-10T10:00:00Z',
-    session: {
-      id: 's3',
-      startTime: 0,
-      status: 'completed',
-      exercises: [
-        {
-          id: 'ex1', name: 'Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 90,
-          sets: [
-            { id: 'st1', reps: '5', weight: '70', completed: true }
-          ]
-        },
-        {
-          id: 'ex2', name: 'Squat', targetMuscle: 'Legs', equipment: 'Barbell', restTimeSeconds: 120,
-          sets: [
-            { id: 'st3', reps: '5', weight: '90', completed: true }
-          ]
-        }
-      ]
-    },
-    summary: { name: 'Upper Power', totalExercises: 2, totalSets: 2, sourceType: 'AD_HOC' }
+  { 
+    id: 'def_cable_fly', 
+    name: 'Cable Fly', 
+    targetMuscle: 'Chest', 
+    equipment: 'Cable', 
+    mechanic: 'Isolation',
+    force: 'Pull', 
+    difficulty: 'Intermediate',
+    restTimeSeconds: 60, 
+    videoUrl: 'https://www.youtube.com/watch?v=Iwe6AmxVf7o',
+    sets: [] 
+  },
+
+  // --- BACK ---
+  { 
+    id: 'def_deadlift', 
+    name: 'Deadlift', 
+    targetMuscle: 'Back', 
+    equipment: 'Barbell', 
+    mechanic: 'Compound',
+    force: 'Pull',
+    difficulty: 'Advanced',
+    instructions: ['Feet shoulder width', 'Grip bar outside knees', 'Keep back flat', 'Drive through heels'],
+    restTimeSeconds: 180, 
+    videoUrl: 'https://www.youtube.com/watch?v=op9kVnSso6Q',
+    sets: [] 
+  },
+  { 
+    id: 'def_pull_up', 
+    name: 'Pull Up', 
+    targetMuscle: 'Back', 
+    equipment: 'Bodyweight', 
+    mechanic: 'Compound',
+    force: 'Pull',
+    difficulty: 'Intermediate',
+    restTimeSeconds: 90, 
+    videoUrl: 'https://www.youtube.com/watch?v=eGo4IYlbE5g',
+    sets: [] 
+  },
+  { 
+    id: 'def_bb_row', 
+    name: 'Bent Over Row', 
+    targetMuscle: 'Back', 
+    equipment: 'Barbell', 
+    mechanic: 'Compound',
+    force: 'Pull',
+    difficulty: 'Intermediate',
+    restTimeSeconds: 90, 
+    videoUrl: 'https://www.youtube.com/watch?v=6FKQ8SgtwK0',
+    sets: [] 
+  },
+
+  // --- LEGS (Quads/Hams/Glutes) ---
+  { 
+    id: 'def_squat', 
+    name: 'Barbell Squat', 
+    targetMuscle: 'Quads', 
+    equipment: 'Barbell', 
+    mechanic: 'Compound',
+    force: 'Push',
+    difficulty: 'Intermediate',
+    restTimeSeconds: 180, 
+    videoUrl: 'https://www.youtube.com/watch?v=ultWZbGWL54',
+    sets: [] 
+  },
+  { 
+    id: 'def_leg_press', 
+    name: 'Leg Press', 
+    targetMuscle: 'Quads', 
+    equipment: 'Machine', 
+    mechanic: 'Compound',
+    force: 'Push',
+    difficulty: 'Beginner',
+    restTimeSeconds: 90, 
+    videoUrl: 'https://www.youtube.com/watch?v=IZxyjW7MPJQ',
+    sets: [] 
+  },
+  { 
+    id: 'def_rdl', 
+    name: 'Romanian Deadlift', 
+    targetMuscle: 'Hamstrings', 
+    equipment: 'Barbell', 
+    mechanic: 'Compound',
+    force: 'Pull',
+    difficulty: 'Intermediate',
+    restTimeSeconds: 90, 
+    videoUrl: 'https://www.youtube.com/watch?v=JCXUYuzwNrM',
+    sets: [] 
+  },
+  { 
+    id: 'def_lunge', 
+    name: 'Walking Lunge', 
+    targetMuscle: 'Glutes', 
+    equipment: 'Dumbbell', 
+    mechanic: 'Compound',
+    force: 'Push',
+    difficulty: 'Beginner',
+    restTimeSeconds: 60, 
+    videoUrl: 'https://www.youtube.com/watch?v=L8fvyb5j6AI',
+    sets: [] 
+  },
+
+  // --- SHOULDERS ---
+  { 
+    id: 'def_ohp', 
+    name: 'Overhead Press', 
+    targetMuscle: 'Shoulders', 
+    equipment: 'Barbell', 
+    mechanic: 'Compound',
+    force: 'Push',
+    difficulty: 'Intermediate',
+    restTimeSeconds: 120, 
+    videoUrl: 'https://www.youtube.com/watch?v=_RlRDWO2jfg',
+    sets: [] 
+  },
+  { 
+    id: 'def_lat_raise', 
+    name: 'Lateral Raise', 
+    targetMuscle: 'Shoulders', 
+    equipment: 'Dumbbell', 
+    mechanic: 'Isolation',
+    force: 'Pull',
+    difficulty: 'Beginner',
+    restTimeSeconds: 60, 
+    videoUrl: 'https://www.youtube.com/watch?v=3VcKaXpzqRo',
+    sets: [] 
+  },
+
+  // --- ARMS ---
+  { 
+    id: 'def_bicep_curl', 
+    name: 'Barbell Curl', 
+    targetMuscle: 'Biceps', 
+    equipment: 'Barbell', 
+    mechanic: 'Isolation',
+    force: 'Pull',
+    difficulty: 'Beginner',
+    restTimeSeconds: 60, 
+    videoUrl: 'https://www.youtube.com/watch?v=kwG2ipFRgfo',
+    sets: [] 
+  },
+  { 
+    id: 'def_tricep_ext', 
+    name: 'Tricep Rope Pushdown', 
+    targetMuscle: 'Triceps', 
+    equipment: 'Cable', 
+    mechanic: 'Isolation',
+    force: 'Push',
+    difficulty: 'Beginner',
+    restTimeSeconds: 60, 
+    videoUrl: 'https://www.youtube.com/watch?v=vB5OHsJ3EME',
+    sets: [] 
   }
 ];
 
+// --- MOCK API CALLS (Local Storage Simulation) ---
+
 export const fetchWeightHistory = async (): Promise<WeightEntry[]> => {
-  // Simulate network delay
-  return new Promise(resolve => setTimeout(() => resolve(MOCK_WEIGHT_HISTORY), 300));
+  const stored = localStorage.getItem('auragym_weight_history');
+  return stored ? JSON.parse(stored) : [];
 };
 
 export const fetchWorkoutLog = async (): Promise<CompletedWorkout[]> => {
-  // Simulate network delay
-  return new Promise(resolve => setTimeout(() => resolve(MOCK_WORKOUT_LOGS), 300));
+  const stored = localStorage.getItem('auragym_completed_workouts');
+  return stored ? JSON.parse(stored) : [];
 };

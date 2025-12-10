@@ -75,7 +75,7 @@ const App: React.FC = () => {
       tags: ['Strength', 'Push/Pull'],
       exercises: [
         { 
-            id: 'e1', name: 'Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 120,
+            id: 'e1', name: 'Barbell Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 120,
             sets: [
                 { id: 's1', reps: '5', weight: '80', completed: false },
                 { id: 's2', reps: '5', weight: '80', completed: false },
@@ -268,6 +268,22 @@ const App: React.FC = () => {
       setCustomExercises(prev => [...prev, ex]);
   };
 
+  const handleUpdateCustomExercise = (updatedExercise: Exercise) => {
+      setCustomExercises(prev => prev.map(ex => ex.id === updatedExercise.id ? updatedExercise : ex));
+      // If we are currently viewing this exercise, update selection
+      if (selectedExercise?.id === updatedExercise.id) {
+          setSelectedExercise(updatedExercise);
+      }
+  };
+
+  const handleDeleteCustomExercise = (exerciseId: string) => {
+      setCustomExercises(prev => prev.filter(ex => ex.id !== exerciseId));
+      if (selectedExercise?.id === exerciseId) {
+          setSelectedExercise(null);
+          handleBack();
+      }
+  };
+
   const renderView = () => {
     switch (currentView) {
       case 'DASHBOARD':
@@ -282,6 +298,8 @@ const App: React.FC = () => {
             onAddProgram={(p) => setPrograms([p, ...programs])}
             onUpdateProgram={handleUpdateProgram}
             onAddCustomExercise={handleAddCustomExercise}
+            onUpdateCustomExercise={handleUpdateCustomExercise}
+            onDeleteCustomExercise={handleDeleteCustomExercise}
             onCompleteSession={handleCompleteSession}
             completedWorkouts={completedWorkouts}
             exerciseHistory={exerciseHistory}
@@ -298,6 +316,9 @@ const App: React.FC = () => {
               handleNavigate('EXERCISE_DETAIL');
             }}
             onBack={handleBack}
+            onAddCustomExercise={handleAddCustomExercise}
+            onUpdateExercise={handleUpdateCustomExercise}
+            onDeleteExercise={handleDeleteCustomExercise}
           />
         );
       case 'EXERCISE_DETAIL':
@@ -310,6 +331,8 @@ const App: React.FC = () => {
             exercise={selectedExercise}
             history={exerciseHistory}
             onBack={handleBack}
+            onUpdateExercise={handleUpdateCustomExercise}
+            onDeleteExercise={handleDeleteCustomExercise}
           />
         );
       case 'BODY':
