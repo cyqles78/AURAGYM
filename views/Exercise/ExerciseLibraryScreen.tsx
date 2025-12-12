@@ -1,30 +1,21 @@
-
 import React, { useState, useMemo } from 'react';
-import { Exercise, ExercisePerformanceEntry, MUSCLE_GROUPS, EQUIPMENT_TYPES, TargetMuscle, Equipment } from '../../types';
-import { Search, Filter, Trophy, ChevronRight, Dumbbell, Activity, Medal, Plus, Edit2 } from 'lucide-react';
+import { Exercise, MUSCLE_GROUPS, EQUIPMENT_TYPES, TargetMuscle, Equipment, ExercisePerformanceEntry } from '../../types';
+import { Search, Filter, Trophy, ChevronRight, Dumbbell, Activity, Medal, Plus, Edit2, Loader2, AlertCircle } from 'lucide-react';
 import { GlassCard } from '../../components/GlassCard';
 import { ExerciseEditModal } from '../../components/ExerciseEditModal';
+import { useExercises, useLogs, useCreateExercise, useUpdateExercise, useDeleteExercise } from '../../hooks/useSupabaseData';
 
 interface ExerciseLibraryScreenProps {
-  exercises: Exercise[]; 
-  history: ExercisePerformanceEntry[]; 
   onSelectExercise: (exercise: Exercise) => void;
   onBack: () => void;
-  onAddCustomExercise?: (exercise: Exercise) => void;
-  onUpdateExercise?: (exercise: Exercise) => void;
-  onDeleteExercise?: (exerciseId: string) => void;
+  // Props for external handlers removed, as we handle data internally now
 }
 
 type MasteryLevel = 'Novice' | 'Regular' | 'Pro' | 'Elite';
 
 export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({ 
-  exercises, 
-  history, 
   onSelectExercise,
   onBack,
-  onAddCustomExercise,
-  onUpdateExercise,
-  onDeleteExercise
 }) => {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -32,18 +23,33 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingExercise, setEditingExercise] = useState<Exercise | undefined>(undefined);
 
+  // --- DATA FETCHING ---
+  const { data: exercises = [], isLoading: exercisesLoading, error: exercisesError } = useExercises();
+  const { data: logs = [], isLoading: logsLoading } = useLogs();
+
+  const createMutation = useCreateExercise();
+  const updateMutation = useUpdateExercise();
+  const deleteMutation = useDeleteExercise();
+
   // --- FILTERS ---
   const muscles = ['All', ...MUSCLE_GROUPS];
   const equipment = ['All', ...EQUIPMENT_TYPES];
 
-  // --- MASTERY LOGIC ---
+  // --- DERIVE HISTORY FOR MASTERY ---
+  // In a real optimized app, we'd fetch aggregate stats via SQL View or RPC
+  // For now, we derive mastery from client-side logs for simplicity
+  const history = useMemo(() => {
+      const entries: ExercisePerformanceEntry[] = [];
+      // This is a rough estimation since we don't have the granular performance rows loaded here 
+      // without a separate query. For purely visual mastery, we can skip or implement a light hook.
+      // We will skip mastery calculation strictly for this refactor step to keep performance high,
+      // or implement a `useExerciseStats` hook later.
+      return entries;
+  }, [logs]);
+
+  // Temporary mock function until we have granular performance data hook
   const getMastery = (exerciseName: string): { level: MasteryLevel; count: number; color: string } => {
-    const count = history.filter(h => h.exerciseName === exerciseName).length;
-    
-    if (count > 100) return { level: 'Elite', count, color: 'text-yellow-400' };
-    if (count > 50) return { level: 'Pro', count, color: 'text-cyan-400' };
-    if (count > 10) return { level: 'Regular', count, color: 'text-emerald-400' };
-    return { level: 'Novice', count, color: 'text-slate-500' };
+    return { level: 'Novice', count: 0, color: 'text-slate-500' };
   };
 
   // --- FILTERING ---
@@ -66,15 +72,44 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
       setShowEditModal(true);
   };
 
-  const handleSave = (ex: Exercise) => {
+  const handleSave = async (ex: Exercise) => {
       if (editingExercise) {
-          // Update Mode
-          onUpdateExercise && onUpdateExercise(ex);
+          updateMutation.mutate(ex, {
+              onSuccess: () => setShowEditModal(false)
+          });
       } else {
-          // Create Mode
-          onAddCustomExercise && onAddCustomExercise(ex);
+          createMutation.mutate(ex, {
+              onSuccess: () => setShowEditModal(false)
+          });
       }
   };
+
+  const handleDelete = async (id: string) => {
+      if (confirm("Delete this exercise? This cannot be undone.")) {
+          deleteMutation.mutate(id, {
+              onSuccess: () => setShowEditModal(false)
+          });
+      }
+  };
+
+  if (exercisesLoading) {
+      return (
+          <div className="h-full flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="animate-spin text-accent" size={32} />
+              <p className="text-secondary text-sm">Loading Library...</p>
+          </div>
+      );
+  }
+
+  if (exercisesError) {
+      return (
+          <div className="h-full flex flex-col items-center justify-center space-y-4 p-6 text-center">
+              <AlertCircle className="text-red-500" size={32} />
+              <p className="text-white font-bold">Failed to load exercises</p>
+              <p className="text-secondary text-xs">{(exercisesError as any).message}</p>
+          </div>
+      );
+  }
 
   return (
     <div className="pb-28 pt-6 space-y-6 animate-in slide-in-from-right h-screen flex flex-col relative">
@@ -146,14 +181,14 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
                     <GlassCard 
                         key={ex.id} 
                         className="!p-4 active:scale-[0.99] transition-transform cursor-pointer group border-l-4 relative"
-                        style={{ borderLeftColor: mastery.level === 'Elite' ? '#FACC15' : mastery.level === 'Pro' ? '#22D3EE' : 'transparent' }}
+                        style={{ borderLeftColor: 'transparent' }}
                         onClick={() => onSelectExercise(ex)}
                     >
                         <div className="flex justify-between items-center">
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                     <h3 className="font-bold text-white truncate">{ex.name}</h3>
-                                    {mastery.level === 'Elite' && <Medal size={14} className="text-yellow-400 fill-yellow-400/20" />}
+                                    {ex.isCustom && <span className="text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded">CUSTOM</span>}
                                 </div>
                                 <div className="flex items-center gap-3 text-xs text-slate-400">
                                     <span className="flex items-center gap-1"><Activity size={12}/> {ex.targetMuscle}</span>
@@ -163,20 +198,19 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
                             </div>
 
                             <div className="flex flex-col items-end gap-1">
-                                <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#000]/30 border border-white/5 ${mastery.color}`}>
-                                    {mastery.level}
-                                </div>
-                                <span className="text-[10px] text-slate-600">{mastery.count} sets</span>
+                                <ChevronRight size={16} className="text-secondary" />
                             </div>
                         </div>
                         
-                        {/* Edit Button (Absolute) */}
-                        <button 
-                            onClick={(e) => handleEditClick(e, ex)}
-                            className="absolute right-2 top-2 p-2 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <Edit2 size={14} />
-                        </button>
+                        {/* Edit Button (Absolute - Only for custom or admin) */}
+                        {ex.isCustom && (
+                            <button 
+                                onClick={(e) => handleEditClick(e, ex)}
+                                className="absolute right-2 top-2 p-2 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                        )}
                     </GlassCard>
                   );
               })}
@@ -196,7 +230,7 @@ export const ExerciseLibraryScreen: React.FC<ExerciseLibraryScreenProps> = ({
             exercise={editingExercise}
             onClose={() => setShowEditModal(false)}
             onSave={handleSave}
-            onDelete={onDeleteExercise}
+            onDelete={editingExercise ? () => handleDelete(editingExercise.id) : undefined}
           />
       )}
     </div>

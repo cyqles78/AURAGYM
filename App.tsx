@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, WorkoutSession, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, MealType, WeightGoal, MacroTargets, Exercise } from './types';
+import React, { useState, useMemo } from 'react';
+import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, WeightGoal, MacroTargets, Exercise } from './types';
 import { Navigation } from './components/Navigation';
 import { DashboardView } from './views/DashboardView';
 import { WorkoutsView } from './views/WorkoutsView';
@@ -9,142 +9,140 @@ import { MoreView } from './views/MoreView';
 import { ExerciseLibraryScreen } from './views/Exercise/ExerciseLibraryScreen';
 import { ExerciseDetailScreen } from './views/Exercise/ExerciseDetailScreen';
 import { ArrowLeft } from 'lucide-react';
-import { usePersistentState } from './hooks/usePersistentState';
-import { DEFAULT_EXERCISES } from './services/DataService';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import { AuthScreen } from './views/Auth/AuthScreen';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { 
+  useExercises, 
+  useWorkouts, 
+  useLogs, 
+  useProfile, 
+  useCreateWorkout, 
+  useCreateExercise, 
+  useLogWorkout 
+} from './hooks/useSupabaseData';
 
-const AppContent: React.FC = () => {
-  const { user } = useAuth();
+// Fallback Default Data
+import { DEFAULT_EXERCISES } from './services/DataService';
+
+const AppContent = () => {
+  const { user, loading: authLoading } = useAuth();
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [history, setHistory] = useState<ViewState[]>(['DASHBOARD']);
   
-  // Navigation State for Detail Views
+  // Navigation State
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 
-  // --- STATE (PERSISTED) ---
-  const [userProfile, setUserProfile] = usePersistentState<UserProfile>('auragym_user_profile', {
-    name: 'Alex Lifter',
-    level: 12,
-    xp: 2450,
-    nextLevelXp: 3000,
-    goal: 'Hypertrophy',
-    subscription: 'Premium'
-  });
+  // --- SUPABASE DATA HOOKS ---
+  const { data: dbProfile, isLoading: profileLoading } = useProfile();
+  const { data: dbExercises, isLoading: exercisesLoading } = useExercises();
+  const { data: dbWorkouts, isLoading: workoutsLoading } = useWorkouts();
+  const { data: dbLogs, isLoading: logsLoading } = useLogs();
 
-  const [stats, setStats] = usePersistentState<DailyStats>('auragym_daily_stats', {
+  const createWorkoutMutation = useCreateWorkout();
+  const createExerciseMutation = useCreateExercise();
+  const logWorkoutMutation = useLogWorkout();
+
+  // --- LOCAL STATE (Features not yet DB-backed) ---
+  // These remain local for now until Nutrition/Body tables are hooked up
+  const [localStats, setLocalStats] = useState<DailyStats>({
     caloriesConsumed: 1850,
     caloriesTarget: 2500,
     proteinConsumed: 145,
     proteinTarget: 180,
     waterConsumed: 3,
     waterTarget: 8,
-    workoutsCompleted: 3,
-    streakDays: 12
+    workoutsCompleted: 0, // Overwritten by DB
+    streakDays: 0 // Overwritten by DB
   });
 
-  const [macroTargets, setMacroTargets] = usePersistentState<MacroTargets>('auragym_macro_targets', {
+  const [macroTargets, setMacroTargets] = useState<MacroTargets>({
     calories: 2400,
     protein: 160,
     carbs: 250,
     fats: 70
   });
 
-  const [waterIntake, setWaterIntake] = usePersistentState<number>('auragym_water_intake', 3);
-
-  const [workouts, setWorkouts] = usePersistentState<WorkoutPlan[]>('auragym_workouts', [
-    {
-      id: '1',
-      title: 'Upper Body Power',
-      duration: '60 min',
-      difficulty: 'Intermediate',
-      tags: ['Strength', 'Push/Pull'],
-      exercises: [
-        { 
-            id: 'e1', name: 'Barbell Bench Press', targetMuscle: 'Chest', equipment: 'Barbell', restTimeSeconds: 120,
-            sets: [
-                { id: 's1', reps: '5', weight: '80', completed: false },
-                { id: 's2', reps: '5', weight: '80', completed: false },
-                { id: 's3', reps: '5', weight: '80', completed: false },
-                { id: 's4', reps: '5', weight: '80', completed: false }
-            ] 
-        },
-        { 
-            id: 'e2', name: 'Bent Over Row', targetMuscle: 'Back', equipment: 'Barbell', restTimeSeconds: 90,
-            sets: [
-                { id: 's1', reps: '8', weight: '60', completed: false },
-                { id: 's2', reps: '8', weight: '60', completed: false },
-                { id: 's3', reps: '8', weight: '60', completed: false }
-            ] 
-        }
-      ]
-    }
+  const [waterIntake, setWaterIntake] = useState<number>(3);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [foodLog, setFoodLog] = useState<FoodLogEntry[]>([]);
+  const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([
+    { date: '2023-01-01', weight: 85.0 }
   ]);
-
-  const [customExercises, setCustomExercises] = usePersistentState<Exercise[]>('auragym_custom_exercises', []);
-  
-  // Merge default exercises with user custom exercises for the full library
-  const fullExerciseLibrary = [...DEFAULT_EXERCISES, ...customExercises];
-
-  const [programs, setPrograms] = usePersistentState<Program[]>('auragym_programs', []);
-
-  const [recipes, setRecipes] = usePersistentState<Recipe[]>('auragym_recipes', [
-    {
-      id: '1',
-      title: 'Protein-Packed Chicken Bowl',
-      calories: 550,
-      protein: 45,
-      carbs: 60,
-      fats: 15,
-      prepTime: '20 min',
-      ingredients: ['200g Chicken Breast', '1 cup Quinoa', 'Avocado', 'Spinach'],
-      steps: ['Cook chicken', 'Boil quinoa', 'Mix everything'],
-      tags: ['Lunch', 'High Protein']
-    }
-  ]);
-
-  const [foodLog, setFoodLog] = usePersistentState<FoodLogEntry[]>('auragym_food_log', []);
-
-  const [weightHistory, setWeightHistory] = usePersistentState<WeightEntry[]>('auragym_weight_history', [
-    { date: '2023-01-01', weight: 85.0 },
-    { date: '2023-02-01', weight: 84.2 },
-    { date: '2023-03-01', weight: 83.5 },
-    { date: '2023-04-01', weight: 82.8 },
-    { date: '2023-05-01', weight: 83.1 },
-    { date: '2023-06-01', weight: 82.5 },
-  ]);
-  
-  const [measurements, setMeasurements] = usePersistentState<MeasurementEntry[]>('auragym_measurements', [
-    { id: 'm1', date: '2023-06-01', type: 'Waist', value: 82, unit: 'cm' },
-    { id: 'm2', date: '2023-06-01', type: 'Chest', value: 105, unit: 'cm' },
-  ]);
-
-  const [weightGoal, setWeightGoal] = usePersistentState<WeightGoal>(
-    'auragym_weight_goal',
-    {
+  const [measurements, setMeasurements] = useState<MeasurementEntry[]>([]);
+  const [weightGoal, setWeightGoal] = useState<WeightGoal>({
       isActive: false,
       startDate: null,
       targetDate: null,
       startWeight: null,
       targetWeight: null,
-    }
-  );
+  });
 
-  const [completedWorkouts, setCompletedWorkouts] = usePersistentState<CompletedWorkout[]>(
-    'auragym_completed_workouts',
-    []
-  );
+  // --- DERIVED DATA ---
+  
+  const fullExerciseLibrary = useMemo(() => {
+      if (!dbExercises || dbExercises.length === 0) return DEFAULT_EXERCISES;
+      return dbExercises;
+  }, [dbExercises]);
 
-  const [exerciseHistory, setExerciseHistory] = usePersistentState<ExercisePerformanceEntry[]>(
-    'auragym_exercise_history',
-    []
-  );
+  const completedWorkouts = dbLogs || [];
 
-  if (!user) {
-    return <AuthScreen />;
+  // Calculate Streak
+  const currentStreak = useMemo(() => {
+      if (!completedWorkouts.length) return 0;
+      
+      const sortedDates: string[] = Array.from(new Set(completedWorkouts.map((w: CompletedWorkout) => w.completedAt.split('T')[0])))
+        .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
+
+      let streak = 0;
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+      // If no workout today or yesterday, streak is broken (0), unless we just want to count "active streak" loosely
+      if (sortedDates[0] !== today && sortedDates[0] !== yesterday) {
+          return 0;
+      }
+
+      let currentDate = new Date(sortedDates[0]);
+      streak++;
+
+      for (let i = 1; i < sortedDates.length; i++) {
+          const prevDate = new Date(sortedDates[i]);
+          const diffTime = Math.abs(currentDate.getTime() - prevDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+          if (diffDays === 1) {
+              streak++;
+              currentDate = prevDate;
+          } else {
+              break;
+          }
+      }
+      return streak;
+  }, [completedWorkouts]);
+
+  const userProfile: UserProfile = dbProfile || {
+    name: 'Guest User',
+    level: 1,
+    xp: 0,
+    nextLevelXp: 1000,
+    goal: 'General Fitness',
+    subscription: 'Free'
+  };
+
+  // --- AUTH & LOADING GATES ---
+
+  if (authLoading) return <LoadingSpinner />;
+  if (!user) return <AuthScreen />;
+
+  // Wait for critical data before rendering app to prevent empty flash
+  if (profileLoading || exercisesLoading || workoutsLoading || logsLoading) {
+      return <LoadingSpinner />;
   }
 
-  // --- GLOBAL NAVIGATION HANDLERS ---
+  // --- NAVIGATION HANDLERS ---
+  
   const handleNavigate = (view: ViewState) => {
     if (view === currentView) return;
     setHistory(prev => [...prev, view]);
@@ -154,177 +152,69 @@ const AppContent: React.FC = () => {
   const handleBack = () => {
     if (history.length <= 1) return;
     const newHistory = [...history];
-    newHistory.pop(); // Remove current
+    newHistory.pop(); 
     const prevView = newHistory[newHistory.length - 1];
     setHistory(newHistory);
     setCurrentView(prevView);
   };
 
-  // --- HELPERS ---
+  // --- ACTION HANDLERS ---
 
-  const getTodayDate = () => new Date().toISOString().split('T')[0];
-
-  const addFoodLogEntry = (entry: {
-    name: string;
-    calories: number;
-    protein: number;
-    carbs?: number;
-    fats?: number;
-    mealType: MealType;
-    source?: 'MANUAL' | 'RECIPE';
-    recipeId?: string;
-  }) => {
-    const calories = Number(entry.calories);
-    const protein = Number(entry.protein);
-    const carbs = Number(entry.carbs || 0);
-    const fats = Number(entry.fats || 0);
-
-    if (isNaN(calories) || calories <= 0) return;
-
-    const newEntry: FoodLogEntry = {
-      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : Date.now().toString(),
-      date: getTodayDate(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      mealType: entry.mealType,
-      name: entry.name || 'Food log',
-      calories,
-      protein,
-      carbs,
-      fats,
-      source: entry.source,
-      recipeId: entry.recipeId,
-    };
-
-    setFoodLog(prev => [newEntry, ...prev]);
-
-    setStats(prev => ({
-      ...prev,
-      caloriesConsumed: prev.caloriesConsumed + calories,
-      proteinConsumed: prev.proteinConsumed + protein,
-    }));
+  const handleCompleteSession = (workout: CompletedWorkout, performanceEntries: ExercisePerformanceEntry[]) => {
+    logWorkoutMutation.mutate({ workout, performance: performanceEntries });
   };
 
-  // --- DATA UPDATE HANDLERS ---
-
-  const handleCompleteSession = (completedWorkout: CompletedWorkout, performanceEntries: ExercisePerformanceEntry[]) => {
-    // Save Completed Workout
-    setCompletedWorkouts(prev => [...prev, completedWorkout]);
-    
-    // Save Exercise History
-    setExerciseHistory(prev => [...prev, ...performanceEntries]);
-    
-    // Update Stats
-    setStats(prev => ({ ...prev, workoutsCompleted: prev.workoutsCompleted + 1 }));
-
-    console.log("Workout Saved:", completedWorkout);
-  };
-
-  const handleAddMeasurement = (type: string, value: number, unit: string) => {
-    if (type === 'Weight') {
-        const today = new Date().toISOString().split('T')[0];
-        setWeightHistory(prev => [...prev, { date: today, weight: value }]);
-    } else {
-        const newEntry: MeasurementEntry = {
-            id: Date.now().toString(),
-            date: new Date().toISOString(),
-            type,
-            value,
-            unit
-        };
-        setMeasurements(prev => [...prev, newEntry]);
-    }
-  };
-
-  const handleQuickLog = (calories: number, protein: number, carbs: number, fats: number, name: string, mealType: MealType) => {
-    addFoodLogEntry({
-      name: name || 'Quick log',
-      calories,
-      protein,
-      carbs,
-      fats,
-      mealType,
-      source: 'MANUAL',
-    });
-  };
-
-  const handleLogRecipeToToday = (recipe: Recipe, mealType: MealType) => {
-    addFoodLogEntry({
-      name: recipe.title,
-      calories: recipe.calories,
-      protein: recipe.protein,
-      carbs: recipe.carbs,
-      fats: recipe.fats,
-      mealType,
-      source: 'RECIPE',
-      recipeId: recipe.id,
-    });
-  };
-
-  const handleUpdateWeightGoal = (goal: WeightGoal) => {
-    setWeightGoal(goal);
-  };
-
-  const handleUpdateProgram = (updatedProgram: Program) => {
-    setPrograms(prev => prev.map(p => p.id === updatedProgram.id ? updatedProgram : p));
+  const handleAddPlan = (plan: WorkoutPlan) => {
+    createWorkoutMutation.mutate(plan);
   };
 
   const handleAddCustomExercise = (ex: Exercise) => {
-      setCustomExercises(prev => [...prev, ex]);
+    createExerciseMutation.mutate(ex);
   };
 
-  const handleUpdateCustomExercise = (updatedExercise: Exercise) => {
-      setCustomExercises(prev => prev.map(ex => ex.id === updatedExercise.id ? updatedExercise : ex));
-      // If we are currently viewing this exercise, update selection
-      if (selectedExercise?.id === updatedExercise.id) {
-          setSelectedExercise(updatedExercise);
-      }
-  };
-
-  const handleDeleteCustomExercise = (exerciseId: string) => {
-      setCustomExercises(prev => prev.filter(ex => ex.id !== exerciseId));
-      if (selectedExercise?.id === exerciseId) {
-          setSelectedExercise(null);
-          handleBack();
-      }
-  };
+  // --- VIEW RENDERING ---
 
   const renderView = () => {
     switch (currentView) {
       case 'DASHBOARD':
-        return <DashboardView stats={{...stats, waterConsumed: waterIntake}} onNavigate={handleNavigate} />;
+        return (
+          <DashboardView 
+            userProfile={userProfile}
+            stats={{
+                ...localStats, 
+                waterConsumed: waterIntake,
+                workoutsCompleted: completedWorkouts.length,
+                streakDays: currentStreak
+            }} 
+            onNavigate={handleNavigate} 
+          />
+        );
       case 'WORKOUTS':
         return (
           <WorkoutsView 
-            plans={workouts} 
+            plans={dbWorkouts || []} 
             programs={programs}
             customExercises={fullExerciseLibrary}
-            onAddPlan={(p) => setWorkouts([p, ...workouts])} 
+            onAddPlan={handleAddPlan} 
             onAddProgram={(p) => setPrograms([p, ...programs])}
-            onUpdateProgram={handleUpdateProgram}
+            onUpdateProgram={(p) => setPrograms(prev => prev.map(pr => pr.id === p.id ? p : pr))}
             onAddCustomExercise={handleAddCustomExercise}
-            onUpdateCustomExercise={handleUpdateCustomExercise}
-            onDeleteCustomExercise={handleDeleteCustomExercise}
+            onUpdateCustomExercise={() => {}} 
+            onDeleteCustomExercise={() => {}} 
             onCompleteSession={handleCompleteSession}
             completedWorkouts={completedWorkouts}
-            exerciseHistory={exerciseHistory}
+            exerciseHistory={[]} // Populated by useLogs mapping or separate hook in future
             onNavigate={handleNavigate}
           />
         );
       case 'EXERCISE_LIBRARY':
         return (
           <ExerciseLibraryScreen
-            exercises={fullExerciseLibrary}
-            history={exerciseHistory}
             onSelectExercise={(ex) => {
               setSelectedExercise(ex);
               handleNavigate('EXERCISE_DETAIL');
             }}
             onBack={handleBack}
-            onAddCustomExercise={handleAddCustomExercise}
-            onUpdateExercise={handleUpdateCustomExercise}
-            onDeleteExercise={handleDeleteCustomExercise}
           />
         );
       case 'EXERCISE_DETAIL':
@@ -335,10 +225,8 @@ const AppContent: React.FC = () => {
         return (
           <ExerciseDetailScreen 
             exercise={selectedExercise}
-            history={exerciseHistory}
+            history={[]} // Need granular history hook
             onBack={handleBack}
-            onUpdateExercise={handleUpdateCustomExercise}
-            onDeleteExercise={handleDeleteCustomExercise}
           />
         );
       case 'BODY':
@@ -346,10 +234,13 @@ const AppContent: React.FC = () => {
           <BodyView 
             weightHistory={weightHistory} 
             measurements={measurements} 
-            onLogMeasurement={handleAddMeasurement}
+            onLogMeasurement={(t, v, u) => {
+                if (t === 'Weight') setWeightHistory([...weightHistory, { date: new Date().toISOString(), weight: v }]);
+                else setMeasurements([...measurements, { id: Date.now().toString(), date: new Date().toISOString(), type: t, value: v, unit: u }]);
+            }}
             weightGoal={weightGoal}
-            onUpdateWeightGoal={handleUpdateWeightGoal}
-            exerciseHistory={exerciseHistory}
+            onUpdateWeightGoal={setWeightGoal}
+            exerciseHistory={[]}
           />
         );
       case 'FOOD':
@@ -360,8 +251,15 @@ const AppContent: React.FC = () => {
             waterConsumed={waterIntake} 
             onUpdateWater={setWaterIntake} 
             foodLog={foodLog}
-            onQuickLog={handleQuickLog}
-            onLogRecipeToToday={handleLogRecipeToToday}
+            onQuickLog={(c, p, ca, f, n, m, id) => {
+                const entry: FoodLogEntry = {
+                    id: Date.now().toString(), date: new Date().toISOString().split('T')[0],
+                    name: n, calories: c, protein: p, carbs: ca, fats: f, mealType: m, fdcId: id
+                };
+                setFoodLog([entry, ...foodLog]);
+                setLocalStats(prev => ({ ...prev, caloriesConsumed: prev.caloriesConsumed + c, proteinConsumed: prev.proteinConsumed + p }));
+            }}
+            onLogRecipeToToday={() => {}}
             macroTargets={macroTargets}
             onUpdateTargets={setMacroTargets}
           />
@@ -370,11 +268,21 @@ const AppContent: React.FC = () => {
         return (
           <MoreView 
             user={userProfile} 
-            onUpdateUser={setUserProfile} 
+            onUpdateUser={() => {}} 
           />
         );
       default:
-        return <DashboardView stats={stats} onNavigate={handleNavigate} />;
+        return (
+            <DashboardView 
+                userProfile={userProfile}
+                stats={{
+                    ...localStats, 
+                    workoutsCompleted: completedWorkouts.length,
+                    streakDays: currentStreak
+                }} 
+                onNavigate={handleNavigate} 
+            />
+        );
     }
   };
 
@@ -404,12 +312,4 @@ const AppContent: React.FC = () => {
   );
 };
 
-const App: React.FC = () => {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
-};
-
-export default App;
+export default AppContent;

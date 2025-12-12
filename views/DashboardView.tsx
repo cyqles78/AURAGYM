@@ -1,10 +1,11 @@
 import React from 'react';
 import { GlassCard } from '../components/GlassCard';
-import { DailyStats } from '../types';
-import { Flame, Droplets, Trophy, Activity, ArrowRight, Zap } from 'lucide-react';
+import { DailyStats, UserProfile } from '../types';
+import { Flame, Droplets } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 
 interface DashboardViewProps {
+  userProfile: UserProfile;
   stats: DailyStats;
   onNavigate: (view: any) => void;
 }
@@ -14,17 +15,30 @@ const activityData = [
   { day: 'T', val: 60 }, { day: 'F', val: 50 }, { day: 'S', val: 80 }, { day: 'S', val: 40 }
 ];
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ stats, onNavigate }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ userProfile, stats, onNavigate }) => {
+  // Get initials for avatar
+  const initials = userProfile.name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
   return (
     <div className="pb-28 pt-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center px-2">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Summary</h1>
-          <p className="text-secondary text-sm font-medium">Monday, Oct 24</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Hello, {userProfile.name.split(' ')[0]}</h1>
+          <p className="text-secondary text-sm font-medium">{todayDate}</p>
         </div>
-        <div className="h-10 w-10 rounded-full bg-surfaceHighlight border border-border flex items-center justify-center">
-             <span className="text-xs font-bold text-white">AL</span>
+        <div 
+            onClick={() => onNavigate('MORE')}
+            className="h-10 w-10 rounded-full bg-surfaceHighlight border border-border flex items-center justify-center cursor-pointer hover:bg-white/10 transition"
+        >
+             <span className="text-xs font-bold text-white">{initials || 'ME'}</span>
         </div>
       </div>
 
@@ -38,18 +52,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ stats, onNavigate 
              <span className="text-sm font-bold text-white">Active Streak</span>
           </div>
           <div className="text-right">
-             <span className="text-2xl font-bold text-white">12</span>
+             <span className="text-2xl font-bold text-white">{stats.streakDays}</span>
              <span className="text-xs text-secondary ml-1">Days</span>
           </div>
         </div>
         
         <div className="space-y-2">
              <div className="flex justify-between text-xs text-secondary font-medium">
-                 <span>Weekly Goal</span>
-                 <span>85%</span>
+                 <span>Workouts Completed</span>
+                 <span>{stats.workoutsCompleted}</span>
              </div>
              <div className="h-2 w-full bg-surfaceHighlight rounded-full overflow-hidden">
-                <div className="h-full w-[85%] bg-white rounded-full"></div>
+                {/* Visual placeholder for weekly goal progress */}
+                <div className="h-full w-[65%] bg-white rounded-full"></div>
              </div>
         </div>
       </GlassCard>
@@ -82,13 +97,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ stats, onNavigate 
       {/* Activity Chart Area */}
       <div className="space-y-3">
         <div className="flex justify-between items-center px-1">
-          <h3 className="text-lg font-bold text-white">Volume</h3>
+          <h3 className="text-lg font-bold text-white">Activity</h3>
         </div>
         <GlassCard className="h-56 !p-0 overflow-hidden flex flex-col">
           <div className="p-5 flex justify-between items-center border-b border-border">
             <div>
-               <p className="text-xs text-secondary font-semibold uppercase">Total Load</p>
-               <p className="text-2xl font-bold text-white mt-1">12,450 kg</p>
+               <p className="text-xs text-secondary font-semibold uppercase">Monthly Volume</p>
+               <p className="text-2xl font-bold text-white mt-1">-- kg</p>
             </div>
           </div>
           <div className="flex-1 w-full min-h-0 pt-4">

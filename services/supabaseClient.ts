@@ -23,8 +23,7 @@ const getEnvVar = (key: string): string => {
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
 const supabaseKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-// Validate or provide fallback to prevent "supabaseUrl is required" runtime error
-// This allows the app to load even if credentials aren't set (Auth will just fail gracefully)
+// Fallback for development to prevent crash if env vars are missing
 const validUrl = supabaseUrl && supabaseUrl.startsWith('http') 
   ? supabaseUrl 
   : 'https://placeholder-project.supabase.co';

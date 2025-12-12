@@ -1,14 +1,12 @@
-
 import React, { useState, useMemo } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { WorkoutPlan, WorkoutSession, Program, ProgramDay, CompletedWorkout, ExercisePerformanceEntry, ProgramDayProgressRequest, ProgramDayProgressResult, Exercise, ViewState } from '../types';
 import { generateAIWorkout, generateAIProgram, ProgramContextInput, generateProgressedProgramDay } from '../services/geminiService';
-import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calendar, Layers, ChevronDown, History, Trophy, TrendingUp, AlertCircle, X, Dumbbell, Hammer, BookOpen } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, LineChart, Line, Cell, XAxis, YAxis, AreaChart, Area, Tooltip, CartesianGrid } from 'recharts';
+import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calendar, Layers, Trophy, TrendingUp, X, Dumbbell, Hammer, BookOpen } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis } from 'recharts';
 import { FocusSessionScreen } from './Workout/FocusSessionScreen';
 import { WorkoutBuilderView } from './WorkoutBuilderView';
 import { WorkoutSummaryScreen } from './WorkoutSummaryScreen';
-import { ExerciseLibraryScreen } from './Exercise/ExerciseLibraryScreen';
 
 interface WorkoutsViewProps {
   plans: WorkoutPlan[];
@@ -82,16 +80,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
   const [generatedProgram, setGeneratedProgram] = useState<Program | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatDate = (isoDate: string) => {
-      return new Date(isoDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
-
   // --- ANALYTICS CALCULATIONS ---
 
   const weeklyVolumeData = useMemo(() => {
@@ -102,6 +90,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     });
     
     return last7Days.map(date => {
+        // Matches based on local date string prefix YYYY-MM-DD
         const dayVolume = completedWorkouts
             .filter(w => w.completedAt.startsWith(date))
             .reduce((sum, w) => sum + (w.summary.estimatedVolume || 0), 0);
@@ -116,6 +105,9 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
   }, [completedWorkouts]);
 
   const muscleFreqData = useMemo(() => {
+    // If we have granular history, calculate frequency
+    if (exerciseHistory.length === 0) return [];
+
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 14);
     
@@ -133,6 +125,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
   }, [exerciseHistory]);
 
   const prProgressData = useMemo(() => {
+    if (exerciseHistory.length === 0) return [];
+
     const grouped: Record<string, { date: string, val: number }[]> = {};
     
     exerciseHistory.forEach(ex => {
@@ -157,8 +151,8 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
             };
         })
         .filter(item => item.data.length >= 2) 
-        .sort((a, b) => b.latest - a.latest) // Sort by weight roughly
-        .slice(0, 4); // Show top 4
+        .sort((a, b) => b.latest - a.latest) 
+        .slice(0, 4); // Top 4
   }, [exerciseHistory]);
 
   // --- HANDLERS ---
@@ -744,23 +738,29 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
                     <span className="text-xs text-secondary font-medium">Last 7 Days</span>
                 </div>
                 <div className="h-32 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={weeklyVolumeData}>
-                            <defs>
-                                <linearGradient id="colorVol" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#FFFFFF" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#FFFFFF" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <Tooltip 
-                                cursor={{stroke: 'rgba(255,255,255,0.1)'}}
-                                contentStyle={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E', borderRadius: '8px', fontSize: '12px' }}
-                                itemStyle={{ color: '#fff' }}
-                            />
-                            <Area type="monotone" dataKey="volume" stroke="#FFFFFF" strokeWidth={2} fill="url(#colorVol)" />
-                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#8E8E93', fontSize: 10}} dy={10}/>
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    {weeklyVolumeData.every(d => d.volume === 0) ? (
+                        <div className="h-full flex items-center justify-center text-xs text-secondary italic border border-dashed border-white/10 rounded-lg">
+                            Log a workout to see data
+                        </div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={weeklyVolumeData}>
+                                <defs>
+                                    <linearGradient id="colorVol" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#FFFFFF" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#FFFFFF" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <Tooltip 
+                                    cursor={{stroke: 'rgba(255,255,255,0.1)'}}
+                                    contentStyle={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E', borderRadius: '8px', fontSize: '12px' }}
+                                    itemStyle={{ color: '#fff' }}
+                                />
+                                <Area type="monotone" dataKey="volume" stroke="#FFFFFF" strokeWidth={2} fill="url(#colorVol)" />
+                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#8E8E93', fontSize: 10}} dy={10}/>
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
             </GlassCard>
 
@@ -782,7 +782,9 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
                             </div>
                         </div>
                     )) : (
-                        <p className="text-xs text-secondary italic">No recent data</p>
+                        <div className="h-24 flex items-center justify-center text-xs text-secondary italic border border-dashed border-white/10 rounded-lg">
+                            No recent data
+                        </div>
                     )}
                 </div>
             </GlassCard>
@@ -807,7 +809,9 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
                              </div>
                         </div>
                     )) : (
-                         <p className="text-xs text-secondary italic">Log more workouts to see PRs</p>
+                         <div className="h-24 flex items-center justify-center text-xs text-secondary italic border border-dashed border-white/10 rounded-lg">
+                             Log more workouts to see PRs
+                         </div>
                     )}
                 </div>
             </GlassCard>
