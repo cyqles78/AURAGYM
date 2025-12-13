@@ -184,6 +184,7 @@ export interface WeightGoal {
 
 export interface UserProfile {
   name: string;
+  username?: string; // Added for Auth update
   level: number;
   xp: number;
   nextLevelXp: number;

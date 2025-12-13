@@ -92,7 +92,7 @@ const AppContent = () => {
   const currentStreak = useMemo(() => {
       if (!completedWorkouts.length) return 0;
       
-      const sortedDates: string[] = Array.from(new Set(completedWorkouts.map((w: CompletedWorkout) => w.completedAt.split('T')[0])))
+      const sortedDates: string[] = Array.from<string>(new Set(completedWorkouts.map((w: CompletedWorkout) => w.completedAt.split('T')[0])))
         .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
 
       let streak = 0;

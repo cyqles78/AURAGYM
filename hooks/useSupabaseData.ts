@@ -16,7 +16,7 @@ const mapExerciseFromDB = (dbEx: any): Exercise => ({
   videoUrl: dbEx.video_url || undefined,
   restTimeSeconds: dbEx.rest_time_seconds || 60,
   isCustom: dbEx.is_custom || false,
-  sets: [] 
+  sets: []
 });
 
 const mapExerciseToDB = (ex: Exercise, userId: string) => ({
@@ -30,7 +30,7 @@ const mapExerciseToDB = (ex: Exercise, userId: string) => ({
   instructions: ex.instructions,
   video_url: ex.videoUrl,
   rest_time_seconds: ex.restTimeSeconds,
-  is_custom: true 
+  is_custom: true
 });
 
 const mapWorkoutPlanFromDB = (dbPlan: any): WorkoutPlan => ({
@@ -40,7 +40,7 @@ const mapWorkoutPlanFromDB = (dbPlan: any): WorkoutPlan => ({
   difficulty: dbPlan.difficulty,
   description: dbPlan.description || undefined,
   tags: dbPlan.tags || [],
-  exercises: dbPlan.exercises || [] 
+  exercises: dbPlan.exercises || []
 });
 
 const mapWorkoutPlanToDB = (plan: WorkoutPlan, userId: string) => ({
@@ -50,14 +50,15 @@ const mapWorkoutPlanToDB = (plan: WorkoutPlan, userId: string) => ({
   duration: plan.duration,
   difficulty: plan.difficulty,
   tags: plan.tags,
-  exercises: plan.exercises 
+  exercises: plan.exercises
 });
 
 const mapProfileFromDB = (dbProfile: any): UserProfile => ({
   name: dbProfile.name || 'User',
+  username: dbProfile.username || undefined,
   level: dbProfile.level || 1,
   xp: dbProfile.xp || 0,
-  nextLevelXp: 1000 * (dbProfile.level || 1), 
+  nextLevelXp: 1000 * (dbProfile.level || 1),
   goal: dbProfile.goal || 'General Fitness',
   subscription: dbProfile.subscription === 'Premium' ? 'Premium' : 'Free'
 });
@@ -68,11 +69,16 @@ export const useExercises = () => {
   return useQuery({
     queryKey: ['exercises'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Fetch exercises that are either system-wide (user_id is null) or belong to the current user
       const { data, error } = await supabase
         .from('exercises')
         .select('*')
+        .or(`user_id.is.null,user_id.eq.${user.id}`)
         .order('name');
-      
+
       if (error) throw error;
       return (data || []).map(mapExerciseFromDB);
     }
@@ -83,9 +89,14 @@ export const useWorkouts = () => {
   return useQuery({
     queryKey: ['workout_plans'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Only fetch workout plans belonging to the current user
       const { data, error } = await supabase
         .from('workout_plans')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -98,13 +109,18 @@ export const useLogs = () => {
   return useQuery({
     queryKey: ['workout_logs'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Only fetch workout logs belonging to the current user
       const { data, error } = await supabase
         .from('workout_logs')
         .select('*')
+        .eq('user_id', user.id)
         .order('started_at', { ascending: false });
 
       if (error) throw error;
-      
+
       return (data || []).map((log: any) => ({
         id: log.id,
         completedAt: log.ended_at || log.started_at,
@@ -114,7 +130,7 @@ export const useLogs = () => {
           endTime: log.ended_at ? new Date(log.ended_at).getTime() : undefined,
           activeDuration: log.active_duration_seconds,
           status: log.status,
-          exercises: [] 
+          exercises: []
         },
         summary: {
           name: log.name || 'Workout',
@@ -144,10 +160,13 @@ export const useProfile = () => {
 
       if (error) {
         console.warn("Profile fetch error:", error);
-        return null; 
+        return null;
       }
+
+      console.log('Fetched profile for user:', user.id, data);
       return mapProfileFromDB(data);
-    }
+    },
+    staleTime: 0, // Always refetch on mount
   });
 };
 
@@ -170,7 +189,6 @@ export const useCreateExercise = () => {
       return mapExerciseFromDB(data);
     },
     onSuccess: (data) => {
-      // Optimistic update or simple invalidation
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
     }
   });
@@ -238,7 +256,7 @@ export const useCreateWorkout = () => {
 
 export const useLogWorkout = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ workout, performance }: { workout: CompletedWorkout, performance: ExercisePerformanceEntry[] }) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -267,7 +285,7 @@ export const useLogWorkout = () => {
         const perfRows = performance.map(p => ({
           user_id: user.id,
           log_id: logData.id,
-          exercise_id: p.exerciseId, 
+          exercise_id: p.exerciseId,
           exercise_name: p.exerciseName,
           target_muscle: p.targetMuscle,
           sets: p.sets,
@@ -278,7 +296,7 @@ export const useLogWorkout = () => {
         const { error: perfError } = await supabase
           .from('exercise_performance')
           .insert(perfRows);
-        
+
         if (perfError) throw perfError;
       }
 
@@ -286,7 +304,38 @@ export const useLogWorkout = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout_logs'] });
-      queryClient.invalidateQueries({ queryKey: ['profile'] }); 
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    }
+  });
+};
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (updates: Partial<UserProfile>) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          name: updates.name,
+          goal: updates.goal,
+          level: updates.level,
+          xp: updates.xp,
+          subscription: updates.subscription,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return mapProfileFromDB(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
     }
   });
 };
