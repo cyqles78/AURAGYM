@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabaseClient';
 import { Exercise, WorkoutPlan, CompletedWorkout, ExercisePerformanceEntry, UserProfile } from '../types';
+import { useOffline } from '../context/OfflineContext';
 
 // --- DATA TRANSFORMATION HELPERS ---
 
@@ -72,7 +73,6 @@ export const useExercises = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Fetch exercises that are either system-wide (user_id is null) or belong to the current user
       const { data, error } = await supabase
         .from('exercises')
         .select('*')
@@ -92,7 +92,6 @@ export const useWorkouts = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Only fetch workout plans belonging to the current user
       const { data, error } = await supabase
         .from('workout_plans')
         .select('*')
@@ -112,7 +111,6 @@ export const useLogs = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Only fetch workout logs belonging to the current user
       const { data, error } = await supabase
         .from('workout_logs')
         .select('*')
@@ -162,11 +160,9 @@ export const useProfile = () => {
         console.warn("Profile fetch error:", error);
         return null;
       }
-
-      console.log('Fetched profile for user:', user.id, data);
       return mapProfileFromDB(data);
     },
-    staleTime: 0, // Always refetch on mount
+    staleTime: 0, 
   });
 };
 
@@ -254,14 +250,29 @@ export const useCreateWorkout = () => {
   });
 };
 
+// --- OFFLINE AWARE MUTATION ---
 export const useLogWorkout = () => {
   const queryClient = useQueryClient();
+  const { isOnline, addOfflineAction } = useOffline();
 
   return useMutation({
     mutationFn: async ({ workout, performance }: { workout: CompletedWorkout, performance: ExercisePerformanceEntry[] }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // OFFLINE HANDLING
+      if (!isOnline) {
+        addOfflineAction('LOG_WORKOUT', { workout, performance, userId: user.id });
+        // Return a mock success object to allow UI to proceed
+        return {
+          id: `temp_${Date.now()}`,
+          name: workout.summary.name,
+          status: 'queued_offline',
+          total_volume: workout.summary.estimatedVolume
+        };
+      }
+
+      // ONLINE HANDLING
       // 1. Insert Log Header
       const { data: logData, error: logError } = await supabase
         .from('workout_logs')

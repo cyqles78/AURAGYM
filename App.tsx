@@ -8,10 +8,11 @@ import { BodyView } from './views/BodyView';
 import { MoreView } from './views/MoreView';
 import { ExerciseLibraryScreen } from './views/Exercise/ExerciseLibraryScreen';
 import { ExerciseDetailScreen } from './views/Exercise/ExerciseDetailScreen';
-import { ArrowLeft } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import { AuthScreen } from './views/Auth/AuthScreen';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { OfflineProvider } from './context/OfflineContext';
+import { NetworkStatus } from './components/NetworkStatus';
 import { 
   useExercises, 
   useWorkouts, 
@@ -44,7 +45,6 @@ const AppContent = () => {
   const logWorkoutMutation = useLogWorkout();
 
   // --- LOCAL STATE (Features not yet DB-backed) ---
-  // These remain local for now until Nutrition/Body tables are hooked up
   const [localStats, setLocalStats] = useState<DailyStats>({
     caloriesConsumed: 1850,
     caloriesTarget: 2500,
@@ -52,8 +52,8 @@ const AppContent = () => {
     proteinTarget: 180,
     waterConsumed: 3,
     waterTarget: 8,
-    workoutsCompleted: 0, // Overwritten by DB
-    streakDays: 0 // Overwritten by DB
+    workoutsCompleted: 0,
+    streakDays: 0
   });
 
   const [macroTargets, setMacroTargets] = useState<MacroTargets>({
@@ -99,7 +99,6 @@ const AppContent = () => {
       const today = new Date().toISOString().split('T')[0];
       const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
-      // If no workout today or yesterday, streak is broken (0), unless we just want to count "active streak" loosely
       if (sortedDates[0] !== today && sortedDates[0] !== yesterday) {
           return 0;
       }
@@ -136,10 +135,10 @@ const AppContent = () => {
   if (authLoading) return <LoadingSpinner />;
   if (!user) return <AuthScreen />;
 
-  // Wait for critical data before rendering app to prevent empty flash
-  if (profileLoading || exercisesLoading || workoutsLoading || logsLoading) {
-      return <LoadingSpinner />;
-  }
+  // Note: We remove the loading spinner for data hooks here to allow 
+  // the app to render from cache if available (Offline Mode).
+  // React Query will provide stale data while fetching.
+  // We can handle specific loading states inside components if needed.
 
   // --- NAVIGATION HANDLERS ---
   
@@ -203,7 +202,7 @@ const AppContent = () => {
             onDeleteCustomExercise={() => {}} 
             onCompleteSession={handleCompleteSession}
             completedWorkouts={completedWorkouts}
-            exerciseHistory={[]} // Populated by useLogs mapping or separate hook in future
+            exerciseHistory={[]}
             onNavigate={handleNavigate}
           />
         );
@@ -225,7 +224,7 @@ const AppContent = () => {
         return (
           <ExerciseDetailScreen 
             exercise={selectedExercise}
-            history={[]} // Need granular history hook
+            history={[]}
             onBack={handleBack}
           />
         );
@@ -287,19 +286,10 @@ const AppContent = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-background font-sans text-primary">
-      {/* Global Header / Back Button Area */}
-      {history.length > 1 && (
-         <button 
-           onClick={handleBack}
-           className="fixed top-6 left-4 z-40 p-2.5 rounded-full bg-surface text-white border border-border shadow-card active:scale-95 transition-all"
-         >
-            <ArrowLeft size={20} />
-         </button>
-      )}
-
+    <div className="relative min-h-screen w-full bg-background font-sans text-primary safe-area-top safe-area-bottom">
+      <NetworkStatus />
       {/* Content Scroll Wrapper */}
-      <div className="h-screen overflow-y-auto no-scrollbar">
+      <div className="h-screen overflow-y-auto no-scrollbar pb-safe">
         <div className="mx-auto max-w-md px-4 min-h-full">
            {renderView()}
         </div>
@@ -312,4 +302,12 @@ const AppContent = () => {
   );
 };
 
-export default AppContent;
+const App = () => {
+  return (
+    <OfflineProvider>
+      <AppContent />
+    </OfflineProvider>
+  );
+};
+
+export default App;

@@ -1,17 +1,25 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import { AuthProvider } from './context/AuthContext';
 
+// 1. Create the QueryClient
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // Data is fresh for 5 minutes
-      gcTime: 1000 * 60 * 30, // Keep unused data in cache for 30 minutes
+      staleTime: 1000 * 60 * 60, // Data is fresh for 1 hour (Gym Mode)
+      gcTime: 1000 * 60 * 60 * 24, // Keep data in cache for 24 hours
       retry: 1,
     },
   },
+});
+
+// 2. Create the persister (localStorage)
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
 });
 
 const rootElement = document.getElementById('root');
@@ -22,10 +30,13 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider 
+      client={queryClient} 
+      persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }} // 24 hours persistence
+    >
       <AuthProvider>
         <App />
       </AuthProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </React.StrictMode>
 );
