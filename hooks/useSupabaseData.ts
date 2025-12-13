@@ -61,7 +61,11 @@ const mapProfileFromDB = (dbProfile: any): UserProfile => ({
   xp: dbProfile.xp || 0,
   nextLevelXp: 1000 * (dbProfile.level || 1),
   goal: dbProfile.goal || 'General Fitness',
-  subscription: dbProfile.subscription === 'Premium' ? 'Premium' : 'Free'
+  subscription: dbProfile.subscription === 'Premium' ? 'Premium' : 'Free',
+  hasCompletedOnboarding: dbProfile.has_completed_onboarding || false,
+  gender: dbProfile.gender,
+  currentWeight: dbProfile.current_weight,
+  height: dbProfile.height,
 });
 
 // --- HOOKS ---
@@ -328,16 +332,24 @@ export const useUpdateProfile = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Map local fields to DB columns
+      const dbUpdates: any = {
+        name: updates.name,
+        goal: updates.goal,
+        level: updates.level,
+        xp: updates.xp,
+        subscription: updates.subscription,
+        updated_at: new Date().toISOString()
+      };
+
+      if (updates.hasCompletedOnboarding !== undefined) dbUpdates.has_completed_onboarding = updates.hasCompletedOnboarding;
+      if (updates.gender !== undefined) dbUpdates.gender = updates.gender;
+      if (updates.currentWeight !== undefined) dbUpdates.current_weight = updates.currentWeight;
+      if (updates.height !== undefined) dbUpdates.height = updates.height;
+
       const { data, error } = await supabase
         .from('profiles')
-        .update({
-          name: updates.name,
-          goal: updates.goal,
-          level: updates.level,
-          xp: updates.xp,
-          subscription: updates.subscription,
-          updated_at: new Date().toISOString()
-        })
+        .update(dbUpdates)
         .eq('id', user.id)
         .select()
         .single();

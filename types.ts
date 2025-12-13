@@ -184,15 +184,22 @@ export interface WeightGoal {
 
 export interface UserProfile {
   name: string;
-  username?: string; // Added for Auth update
+  username?: string;
   level: number;
   xp: number;
   nextLevelXp: number;
   goal: string;
   subscription: 'Free' | 'Premium';
+  
+  // New Onboarding & Bio Fields
+  hasCompletedOnboarding: boolean;
+  gender?: 'Male' | 'Female' | 'Other';
+  currentWeight?: number;
+  height?: number;
 }
 
 export type ViewState = 
+    'ONBOARDING' |
     'DASHBOARD' | 
     'WORKOUTS' | 
     'BODY' | 

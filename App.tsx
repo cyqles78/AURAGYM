@@ -13,6 +13,7 @@ import { AuthScreen } from './views/Auth/AuthScreen';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { OfflineProvider } from './context/OfflineContext';
 import { NetworkStatus } from './components/NetworkStatus';
+import { OnboardingScreen } from './views/Onboarding/OnboardingScreen';
 import { 
   useExercises, 
   useWorkouts, 
@@ -127,18 +128,21 @@ const AppContent = () => {
     xp: 0,
     nextLevelXp: 1000,
     goal: 'General Fitness',
-    subscription: 'Free'
+    subscription: 'Free',
+    hasCompletedOnboarding: false
   };
 
   // --- AUTH & LOADING GATES ---
 
-  if (authLoading) return <LoadingSpinner />;
+  if (authLoading || profileLoading) return <LoadingSpinner />;
   if (!user) return <AuthScreen />;
 
-  // Note: We remove the loading spinner for data hooks here to allow 
-  // the app to render from cache if available (Offline Mode).
-  // React Query will provide stale data while fetching.
-  // We can handle specific loading states inside components if needed.
+  // --- ONBOARDING GATE ---
+  // If user exists (auth checked), but profile says incomplete, show wizard.
+  // We use dbProfile directly to avoid flashing if default fallback is used briefly.
+  if (dbProfile && (!dbProfile.hasCompletedOnboarding || !dbProfile.goal)) {
+      return <OnboardingScreen user={dbProfile} onFinish={() => window.location.reload()} />;
+  }
 
   // --- NAVIGATION HANDLERS ---
   
@@ -175,6 +179,8 @@ const AppContent = () => {
 
   const renderView = () => {
     switch (currentView) {
+      case 'ONBOARDING':
+        return <OnboardingScreen user={userProfile} onFinish={() => handleNavigate('DASHBOARD')} />;
       case 'DASHBOARD':
         return (
           <DashboardView 
@@ -295,8 +301,10 @@ const AppContent = () => {
         </div>
       </div>
 
-      {/* Bottom Nav */}
-      <Navigation currentView={currentView} setView={handleNavigate} />
+      {/* Bottom Nav (Hidden during onboarding) */}
+      {currentView !== 'ONBOARDING' && (
+        <Navigation currentView={currentView} setView={handleNavigate} />
+      )}
 
     </div>
   );
