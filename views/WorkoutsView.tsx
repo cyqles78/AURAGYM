@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { WorkoutPlan, WorkoutSession, Program, ProgramDay, CompletedWorkout, ExercisePerformanceEntry, ProgramDayProgressRequest, ProgramDayProgressResult, Exercise, ViewState } from '../types';
-import { generateAIWorkout, generateAIProgram, ProgramContextInput, generateProgressedProgramDay } from '../services/geminiService';
-import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calendar, Layers, Trophy, TrendingUp, X, Dumbbell, Hammer, BookOpen } from 'lucide-react';
+import { generateAIWorkout, generateProgressedProgramDay } from '../services/geminiService';
+import { Plus, Play, Clock, BarChart2, Sparkles, ChevronRight, ArrowLeft, Calendar, Layers, Trophy, TrendingUp, X, Dumbbell, Hammer, BookOpen, Edit2 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis } from 'recharts';
 import { FocusSessionScreen } from './Workout/FocusSessionScreen';
 import { WorkoutBuilderView } from './WorkoutBuilderView';
 import { WorkoutSummaryScreen } from './WorkoutSummaryScreen';
+import { ProgramBuilderScreen } from './Program/ProgramBuilderScreen';
+import { ProgramEditor } from './Program/ProgramEditor';
 
 interface WorkoutsViewProps {
   plans: WorkoutPlan[];
@@ -24,7 +26,7 @@ interface WorkoutsViewProps {
   onNavigate: (view: ViewState) => void;
 }
 
-type WorkoutsMode = 'LIST' | 'GENERATOR' | 'ACTIVE_SESSION' | 'CREATE_PLAN' | 'PROGRAM_BUILDER' | 'PROGRAM_DETAIL' | 'BUILDER' | 'SUMMARY';
+type WorkoutsMode = 'LIST' | 'GENERATOR' | 'ACTIVE_SESSION' | 'CREATE_PLAN' | 'PROGRAM_BUILDER' | 'PROGRAM_EDITOR' | 'PROGRAM_DETAIL' | 'BUILDER' | 'DAY_BUILDER' | 'SUMMARY';
 
 export const WorkoutsView: React.FC<WorkoutsViewProps> = ({ 
     plans = [], 
@@ -55,30 +57,15 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
   const [level, setLevel] = useState('Intermediate');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Program Detail State
+  // Program Detail & Edit State
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
+  const [editingDayContext, setEditingDayContext] = useState<{weekIndex: number, dayIndex: number} | null>(null);
 
   // AI Progression State
   const [progressPreview, setProgressPreview] = useState<ProgramDayProgressResult | null>(null);
   const [progressContext, setProgressContext] = useState<{programId: string, weekNumber: number, dayId: string} | null>(null);
   const [isProgressLoading, setIsProgressLoading] = useState(false);
-
-  // Program Builder State
-  const [wizardStep, setWizardStep] = useState(1);
-  const [programContext, setProgramContext] = useState<ProgramContextInput>({
-    goal: 'Hypertrophy',
-    level: 'Intermediate',
-    equipment: ['Dumbbells', 'Machines'],
-    timePerSession: 60,
-    constraints: '',
-    daysPerWeek: 4,
-    durationWeeks: 4,
-    splitStyle: 'Upper/Lower',
-    programName: ''
-  });
-  const [generatedProgram, setGeneratedProgram] = useState<Program | null>(null);
-  const [generationError, setGenerationError] = useState<string | null>(null);
 
   // --- ANALYTICS CALCULATIONS ---
 
@@ -90,7 +77,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     });
     
     return last7Days.map(date => {
-        // Matches based on local date string prefix YYYY-MM-DD
         const dayVolume = completedWorkouts
             .filter(w => w.completedAt.startsWith(date))
             .reduce((sum, w) => sum + (w.summary.estimatedVolume || 0), 0);
@@ -105,7 +91,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
   }, [completedWorkouts]);
 
   const muscleFreqData = useMemo(() => {
-    // If we have granular history, calculate frequency
     if (exerciseHistory.length === 0) return [];
 
     const cutoff = new Date();
@@ -139,7 +124,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
         }
     });
     
-    // Convert to array and filter for interesting ones (at least 2 data points or very recent)
     return Object.entries(grouped)
         .map(([name, data]) => {
             const sorted = data.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -162,7 +146,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
         id: Date.now().toString(),
         planId: plan.id,
         startTime: Date.now(),
-        exercises: JSON.parse(JSON.stringify(plan.exercises || [])), // Deep copy with fallback
+        exercises: JSON.parse(JSON.stringify(plan.exercises || [])),
         status: 'active'
     };
     setActiveSession(newSession);
@@ -183,7 +167,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
   };
 
   const handleSessionFinished = (finishedSession: WorkoutSession) => {
-    // 1. Calculate Stats & PRs
     const completedAt = new Date().toISOString();
     const completedWorkoutId = finishedSession.id;
     let totalVolume = 0;
@@ -193,7 +176,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     finishedSession.exercises.forEach(ex => {
         const validSets = ex.sets.filter(s => {
            const r = parseFloat(s.reps);
-           // Count volume if completed
            return !isNaN(r) && r > 0 && s.completed;
         });
         
@@ -201,19 +183,16 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
         totalVolume += exerciseVolume;
         totalSets += validSets.length;
 
-        // PR Detection
         let bestSet1RM = 0;
         validSets.forEach(s => {
             const w = parseFloat(s.weight) || 0;
             const r = parseFloat(s.reps) || 0;
             if(w > 0 && r > 0) {
-                // Epley Formula
                 const e1rm = w * (1 + r/30);
                 if(e1rm > bestSet1RM) bestSet1RM = e1rm;
             }
         });
 
-        // Check History for PR
         const historyForEx = exerciseHistory.filter(h => h.exerciseName === ex.name);
         const historicalMax = Math.max(...historyForEx.map(h => h.bestSetEstimated1RM || 0), 0);
         const isPR = bestSet1RM > historicalMax && bestSet1RM > 0;
@@ -233,7 +212,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
         }
     });
 
-    // 2. Determine Session Name
     let sessionName = 'Workout';
     if (finishedSession.programId && finishedSession.programDayId) {
         const prog = programs.find(p => p.id === finishedSession.programId);
@@ -244,7 +222,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
         if (plan) sessionName = plan.title;
     }
 
-    // 3. Construct Objects
     const completedWorkout: CompletedWorkout = {
         id: completedWorkoutId,
         completedAt,
@@ -263,8 +240,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
 
     onCompleteSession(completedWorkout, performanceEntries);
     setActiveSession(null);
-    
-    // Switch to Summary View
     setLastSessionData({
         workout: completedWorkout,
         prs: performanceEntries.filter(p => p.isPR)
@@ -282,54 +257,10 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     setIsGenerating(false);
   };
 
-  const handleGenerateProgram = async () => {
-    setGenerationError(null);
-    setIsGenerating(true);
-    // Use fallback name if empty
-    const finalContext = {
-        ...programContext,
-        programName: programContext.programName || `${programContext.goal} ${programContext.splitStyle}`
-    };
-    
-    try {
-        const program = await generateAIProgram(finalContext);
-        if (program) {
-            setGeneratedProgram({ ...program, id: Date.now().toString() });
-        } else {
-            setGenerationError("The AI couldn't generate a program right now. Please try again.");
-        }
-    } catch (error) {
-        console.error(error);
-        setGenerationError("An unexpected error occurred. Please try again.");
-    } finally {
-        setIsGenerating(false);
-    }
-  };
-
-  const handleSaveProgram = () => {
-      if (generatedProgram) {
-          onAddProgram(generatedProgram);
-          
-          // Set selection state to view the new program
-          setSelectedProgram(generatedProgram);
-          setSelectedWeekIndex(0);
-
-          // Reset Builder
-          setGeneratedProgram(null);
-          setWizardStep(1);
-          setProgramContext(prev => ({ ...prev, programName: '' }));
-          
-          setViewMode('PROGRAM_DETAIL');
-      }
-  };
-
-  // --- AI PROGRESSION HANDLERS ---
-  
   const handleAIAdjustDay = async (program: Program, weekNum: number, day: ProgramDay) => {
     setProgressContext({ programId: program.id, weekNumber: weekNum, dayId: day.id });
     setIsProgressLoading(true);
     
-    // Build context from history
     const exercisesContext = (day.exercises || []).map(ex => {
       const recent = exerciseHistory
         .filter(h => h.exerciseName === ex.name)
@@ -371,7 +302,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
   const handleApplyProgress = () => {
     if (!selectedProgram || !progressPreview || !selectedProgram.weeks || !progressContext) return;
 
-    // Correctly locate the week and day to update based on the saved context
     const updatedWeeks = selectedProgram.weeks.map(week => {
         if (week.number === progressContext.weekNumber) {
             return {
@@ -399,14 +329,13 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     };
 
     onUpdateProgram(updatedProgram);
-    setSelectedProgram(updatedProgram); // Update local view state immediately
+    setSelectedProgram(updatedProgram);
     setProgressPreview(null);
     setProgressContext(null);
   };
 
   // --- SUB-VIEWS ---
 
-  // 1. ACTIVE SESSION (NEW FOCUS MODE)
   if (viewMode === 'ACTIVE_SESSION' && activeSession) {
     return (
         <FocusSessionScreen 
@@ -418,7 +347,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
     );
   }
 
-  // 2. WORKOUT SUMMARY (NEW)
   if (viewMode === 'SUMMARY' && lastSessionData) {
       return (
           <WorkoutSummaryScreen 
@@ -430,7 +358,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
       );
   }
 
-  // 3. WORKOUT BUILDER
   if (viewMode === 'BUILDER') {
       return (
           <WorkoutBuilderView 
@@ -445,7 +372,57 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
       );
   }
 
-  // 4. SINGLE WORKOUT GENERATOR
+  // --- DAY BUILDER (For editing a specific day in a program) ---
+  if (viewMode === 'DAY_BUILDER' && selectedProgram && editingDayContext) {
+      // Find the day to initialize the builder
+      const dayToEdit = selectedProgram.weeks[editingDayContext.weekIndex].days[editingDayContext.dayIndex];
+      
+      return (
+          <WorkoutBuilderView 
+             initialLibrary={customExercises} // This is the library to pick from
+             initialState={{
+                 title: dayToEdit.name,
+                 exercises: dayToEdit.exercises
+             }}
+             onBack={() => setViewMode('PROGRAM_EDITOR')}
+             onSave={(plan) => {
+                 // Update the specific day in the program
+                 const updatedWeeks = [...selectedProgram.weeks];
+                 updatedWeeks[editingDayContext.weekIndex].days[editingDayContext.dayIndex] = {
+                     ...updatedWeeks[editingDayContext.weekIndex].days[editingDayContext.dayIndex],
+                     name: plan.title, // Update day name if user changed title
+                     exercises: plan.exercises,
+                     sessionDuration: plan.duration
+                 };
+                 
+                 const updatedProgram = { ...selectedProgram, weeks: updatedWeeks };
+                 onUpdateProgram(updatedProgram);
+                 setSelectedProgram(updatedProgram);
+                 setViewMode('PROGRAM_EDITOR');
+             }}
+             onAddCustomExercise={onAddCustomExercise}
+          />
+      );
+  }
+
+  // --- PROGRAM EDITOR ---
+  if (viewMode === 'PROGRAM_EDITOR' && selectedProgram) {
+      return (
+          <ProgramEditor
+            initialProgram={selectedProgram}
+            onSave={(updatedProg) => {
+                onUpdateProgram(updatedProg);
+                setViewMode('PROGRAM_DETAIL');
+            }}
+            onBack={() => setViewMode('LIST')}
+            onEditDay={(weekIndex, dayIndex) => {
+                setEditingDayContext({ weekIndex, dayIndex });
+                setViewMode('DAY_BUILDER');
+            }}
+          />
+      );
+  }
+
   if (viewMode === 'GENERATOR') {
       return (
         <div className="pb-28 pt-6 space-y-6 min-h-screen">
@@ -470,21 +447,6 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
                     </div>
                 </div>
 
-                <div>
-                    <label className="text-xs text-secondary uppercase tracking-wider font-bold mb-4 block">Experience Level</label>
-                    <div className="flex justify-between gap-2">
-                        {['Beginner', 'Intermediate', 'Advanced'].map(l => (
-                            <button
-                                key={l}
-                                onClick={() => setLevel(l)}
-                                className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${level === l ? 'bg-white text-black border-white' : 'bg-surfaceHighlight text-secondary border-border'}`}
-                            >
-                                {l}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
                 <button 
                     onClick={handleGenerateSingle}
                     disabled={isGenerating}
@@ -497,95 +459,44 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
       )
   }
 
-  // 5. PROGRAM BUILDER WIZARD
   if (viewMode === 'PROGRAM_BUILDER') {
       return (
-          <div className="pb-28 pt-6 space-y-6 min-h-screen animate-in slide-in-from-right">
-              {/* [Existing Program Builder Code - Kept brief for this patch] */}
-              <div className="flex items-center space-x-2 mb-6 px-1">
-                  <button onClick={() => {
-                      if (generatedProgram) {
-                          setGeneratedProgram(null);
-                          setWizardStep(4);
-                      } else if (wizardStep > 1) {
-                          setWizardStep(s => s - 1);
-                      } else {
-                          setViewMode('LIST');
-                      }
-                  }} className="p-2 rounded-full hover:bg-surfaceHighlight text-white"><ArrowLeft size={20}/></button>
-                  <h1 className="text-2xl font-bold text-white">Program Builder</h1>
-              </div>
-              
-              {!generatedProgram && (
-                <GlassCard className="space-y-6">
-                    {/* Simplified steps for brevity in this fix block */}
-                    <div className="space-y-6 animate-in slide-in-from-right">
-                        <h2 className="text-lg font-bold text-white">Step {wizardStep}: Configuration</h2>
-                        {/* ... Wizard Logic ... */}
-                        {wizardStep === 1 && (
-                             <div className="grid grid-cols-1 gap-2">
-                                {['Hypertrophy', 'Strength', 'Fat Loss'].map(g => (
-                                    <button key={g} onClick={() => setProgramContext({...programContext, goal: g})} className={`p-3 rounded-xl border ${programContext.goal === g ? 'bg-white text-black' : 'text-white'}`}>{g}</button>
-                                ))}
-                                <button onClick={() => setWizardStep(2)} className="w-full py-4 bg-white text-black font-bold rounded-xl mt-4">Next</button>
-                             </div>
-                        )}
-                        {wizardStep === 2 && (
-                             <div>
-                                <label className="text-white block mb-2">Duration (Weeks)</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {[4, 6, 8, 12].map(w => (
-                                        <button key={w} onClick={() => setProgramContext({...programContext, durationWeeks: w})} className={`py-2 rounded-xl border ${programContext.durationWeeks === w ? 'bg-white text-black' : 'text-white'}`}>{w}</button>
-                                    ))}
-                                </div>
-                                <button onClick={() => setWizardStep(3)} className="w-full py-4 bg-white text-black font-bold rounded-xl mt-4">Next</button>
-                             </div>
-                        )}
-                        {wizardStep === 3 && (
-                             <div className="space-y-4">
-                                <label className="text-white block">Equipment</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {['Bodyweight', 'Dumbbells', 'Barbell', 'Machines'].map(eq => (
-                                        <button key={eq} onClick={() => {
-                                            const newEq = programContext.equipment.includes(eq) ? programContext.equipment.filter(i => i !== eq) : [...programContext.equipment, eq];
-                                            setProgramContext({...programContext, equipment: newEq});
-                                        }} className={`px-3 py-2 rounded-lg border ${programContext.equipment.includes(eq) ? 'bg-white text-black' : 'text-white'}`}>{eq}</button>
-                                    ))}
-                                </div>
-                                <button onClick={() => setWizardStep(4)} className="w-full py-4 bg-white text-black font-bold rounded-xl mt-4">Next</button>
-                             </div>
-                        )}
-                        {wizardStep === 4 && (
-                             <div className="space-y-4">
-                                <label className="text-white block">Program Name</label>
-                                <input type="text" value={programContext.programName} onChange={(e) => setProgramContext({...programContext, programName: e.target.value})} className="w-full bg-surfaceHighlight p-3 rounded-xl text-white" placeholder="My Program"/>
-                                <button onClick={handleGenerateProgram} disabled={isGenerating} className="w-full py-4 bg-white text-black font-bold rounded-xl mt-4">{isGenerating ? 'Generating...' : 'Generate'}</button>
-                             </div>
-                        )}
-                    </div>
-                </GlassCard>
-              )}
-
-              {generatedProgram && (
-                   <GlassCard>
-                       <h2 className="text-2xl font-bold text-white mb-4">{generatedProgram.name}</h2>
-                       <button onClick={handleSaveProgram} className="w-full py-4 bg-white text-black font-bold rounded-xl">Save Program</button>
-                   </GlassCard>
-              )}
-          </div>
+          <ProgramBuilderScreen 
+            onBack={() => setViewMode('LIST')}
+            onProgramCreated={(program) => {
+                onAddProgram(program);
+                setSelectedProgram(program);
+                setSelectedWeekIndex(0);
+                
+                // If it's a "Manual" program (empty), go straight to Editor
+                // Simple heuristic: checks if ID starts with manual or has 0 exercises in first day
+                if (program.id.startsWith('manual') || (program.weeks[0]?.days[0]?.exercises.length === 0)) {
+                    setViewMode('PROGRAM_EDITOR');
+                } else {
+                    setViewMode('PROGRAM_DETAIL');
+                }
+            }}
+          />
       );
   }
 
-  // 6. PROGRAM DETAIL VIEW
   if (viewMode === 'PROGRAM_DETAIL' && selectedProgram) {
     const validWeeks = (selectedProgram.weeks || []).filter(w => w.days && w.days.length > 0);
     const activeWeek = validWeeks[selectedWeekIndex] || validWeeks[0];
 
     return (
         <div className="pb-28 pt-6 space-y-6 min-h-screen animate-in slide-in-from-right relative">
-            <div className="flex items-center space-x-2 mb-2 px-1">
-                <button onClick={() => { setViewMode('LIST'); setSelectedProgram(null); }} className="p-2 rounded-full hover:bg-surfaceHighlight text-white"><ArrowLeft size={20}/></button>
-                <h1 className="text-xl font-bold text-white truncate">{selectedProgram.name}</h1>
+            <div className="flex items-center justify-between px-1 mb-2">
+                <div className="flex items-center space-x-2">
+                    <button onClick={() => { setViewMode('LIST'); setSelectedProgram(null); }} className="p-2 rounded-full hover:bg-surfaceHighlight text-white"><ArrowLeft size={20}/></button>
+                    <h1 className="text-xl font-bold text-white truncate max-w-[200px]">{selectedProgram.name}</h1>
+                </div>
+                <button 
+                    onClick={() => setViewMode('PROGRAM_EDITOR')}
+                    className="p-2 bg-surfaceHighlight rounded-full text-white hover:bg-white/20 transition"
+                >
+                    <Edit2 size={18} />
+                </button>
             </div>
 
             {/* Week Selector */}

@@ -1,15 +1,18 @@
-
 import { useState, useCallback } from 'react';
 import { Exercise, WorkoutPlan, WorkoutSet } from '../types';
 
 interface UseRoutineBuilderProps {
   initialExercises: Exercise[]; // From the available library
+  preloadedState?: {
+      title?: string;
+      exercises?: Exercise[];
+  };
   onSave: (routine: WorkoutPlan) => void;
 }
 
-export const useRoutineBuilder = ({ initialExercises, onSave }: UseRoutineBuilderProps) => {
-  const [routineTitle, setRoutineTitle] = useState('New Routine');
-  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
+export const useRoutineBuilder = ({ initialExercises, preloadedState, onSave }: UseRoutineBuilderProps) => {
+  const [routineTitle, setRoutineTitle] = useState(preloadedState?.title || 'New Routine');
+  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>(preloadedState?.exercises || []);
   const [availableExercises] = useState<Exercise[]>(initialExercises);
 
   const addExercise = useCallback((exerciseId: string) => {

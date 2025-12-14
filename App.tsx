@@ -15,6 +15,7 @@ import { OfflineProvider } from './context/OfflineContext';
 import { NetworkStatus } from './components/NetworkStatus';
 import { OnboardingScreen } from './views/Onboarding/OnboardingScreen';
 import { InteractiveTour } from './components/InteractiveTour';
+import { usePersistentState } from './hooks/usePersistentState';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useExercises,
@@ -70,7 +71,10 @@ const AppContent = () => {
   });
 
   const [waterIntake, setWaterIntake] = useState<number>(3);
-  const [programs, setPrograms] = useState<Program[]>([]);
+  
+  // PERSISTED PROGRAMS
+  const [programs, setPrograms] = usePersistentState<Program[]>('auragym_programs', []);
+  
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [foodLog, setFoodLog] = useState<FoodLogEntry[]>([]);
   const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([
@@ -137,12 +141,11 @@ const AppContent = () => {
     hasCompletedOnboarding: false
   };
 
-  // --- TOUR CHECK (MOVED HERE - BEFORE GATES) ---
+  // --- TOUR CHECK ---
   useEffect(() => {
     const shouldShowTour = localStorage.getItem('auragym_show_tour');
     if (shouldShowTour === 'true') {
       localStorage.removeItem('auragym_show_tour');
-      // Delay to ensure DOM is ready
       setTimeout(() => setShowTour(true), 1500);
     }
   }, []);
@@ -150,43 +153,26 @@ const AppContent = () => {
   // --- AUTH & LOADING GATES ---
 
   if (authLoading) return <LoadingSpinner />;
-  // Only show spinner for profile loading if we don't have cached data (to avoid flicker)
   if (profileLoading && !dbProfile) return <LoadingSpinner />;
   if (!user) return <AuthScreen />;
 
-  // --- ONBOARDING FINISH HANDLER ---
   const handleOnboardingFinish = async () => {
       console.log("Finishing onboarding...");
-      
-      // 1. Optimistic Update: Immediately update cache so the Gate passes
       if (dbProfile) {
           queryClient.setQueryData(['profile'], {
               ...dbProfile,
               hasCompletedOnboarding: true,
-              // Ensure we don't block on goal check either
               goal: dbProfile.goal || 'General Fitness'
           });
       }
-
-      // 2. Background Refetch: Ensure data is synced with DB
       queryClient.invalidateQueries({ queryKey: ['profile'] });
-      
-      // 3. Set Flag for Tour (Effect at top will pick this up on next reload, 
-      // but since we are already mounted, we set state directly here too)
       localStorage.removeItem('auragym_show_tour'); 
-      
-      // 4. Ensure we are on dashboard
       setCurrentView('DASHBOARD');
-
-      // 5. Activate Tour with a safer delay to allow Dashboard DOM to mount fully
       setTimeout(() => {
           setShowTour(true);
       }, 1000);
   };
 
-  // --- ONBOARDING GATE ---
-  // If user exists (auth checked), but profile says incomplete, show wizard.
-  // We use dbProfile directly to avoid flashing if default fallback is used briefly.
   if (dbProfile && (!dbProfile.hasCompletedOnboarding || !dbProfile.goal)) {
     return <OnboardingScreen user={dbProfile} onFinish={handleOnboardingFinish} />;
   }
@@ -227,7 +213,6 @@ const AppContent = () => {
   const renderView = () => {
     switch (currentView) {
       case 'ONBOARDING':
-        // This case might be reached if state is manually set
         return <OnboardingScreen user={userProfile} onFinish={handleOnboardingFinish} />;
       case 'DASHBOARD':
         return (
@@ -342,19 +327,16 @@ const AppContent = () => {
   return (
     <div className="relative min-h-screen w-full bg-background font-sans text-primary safe-area-top safe-area-bottom">
       <NetworkStatus />
-      {/* Content Scroll Wrapper */}
       <div className="h-screen overflow-y-auto no-scrollbar pb-safe">
         <div className="mx-auto max-w-md px-4 min-h-full">
           {renderView()}
         </div>
       </div>
 
-      {/* Bottom Nav (Hidden during onboarding) */}
       {currentView !== 'ONBOARDING' && !((dbProfile && (!dbProfile.hasCompletedOnboarding || !dbProfile.goal))) && (
         <Navigation currentView={currentView} setView={handleNavigate} />
       )}
 
-      {/* Interactive Tour */}
       {showTour && (
         <InteractiveTour onComplete={() => setShowTour(false)} />
       )}

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ArrowLeft, Save, Plus, Search, GripVertical, Trash2, Dumbbell, Settings } from 'lucide-react';
 import { Exercise, WorkoutPlan } from '../types';
@@ -7,6 +6,10 @@ import { ExerciseCreationModal } from '../components/ExerciseCreationModal';
 
 interface WorkoutBuilderViewProps {
   initialLibrary: Exercise[];
+  initialState?: {
+      title?: string;
+      exercises?: Exercise[];
+  };
   onSave: (routine: WorkoutPlan) => void;
   onBack: () => void;
   onAddCustomExercise: (ex: Exercise) => void;
@@ -14,6 +17,7 @@ interface WorkoutBuilderViewProps {
 
 export const WorkoutBuilderView: React.FC<WorkoutBuilderViewProps> = ({ 
   initialLibrary, 
+  initialState,
   onSave, 
   onBack,
   onAddCustomExercise
@@ -29,7 +33,11 @@ export const WorkoutBuilderView: React.FC<WorkoutBuilderViewProps> = ({
     updateExerciseConfig,
     updateSetDetails,
     saveRoutine
-  } = useRoutineBuilder({ initialExercises: initialLibrary, onSave });
+  } = useRoutineBuilder({ 
+      initialExercises: initialLibrary, 
+      preloadedState: initialState,
+      onSave 
+  });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
