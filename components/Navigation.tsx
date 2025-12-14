@@ -9,7 +9,7 @@ interface NavigationProps {
 
 export const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) => {
   const navItems = [
-    { id: 'WORKOUTS', icon: Dumbbell, label: 'Train' },
+    { id: 'WORKOUTS', icon: Dumbbell, label: 'Train', tour: 'quick-start' }, // Added tour ID here
     { id: 'BODY', icon: User, label: 'Body' },
     { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Home' },
     { id: 'FOOD', icon: Utensils, label: 'Food' },
@@ -28,6 +28,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) 
               <button
                 key={item.id}
                 onClick={() => setView(item.id as ViewState)}
+                data-tour={item.tour} // Apply data-tour attribute
                 className={`
                   relative flex flex-col items-center justify-center w-full py-1
                   transition-all duration-300

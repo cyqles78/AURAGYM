@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ViewState, DailyStats, WorkoutPlan, Recipe, WeightEntry, UserProfile, MeasurementEntry, Program, CompletedWorkout, ExercisePerformanceEntry, FoodLogEntry, WeightGoal, MacroTargets, Exercise } from './types';
 import { Navigation } from './components/Navigation';
 import { DashboardView } from './views/DashboardView';
@@ -14,14 +14,16 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { OfflineProvider } from './context/OfflineContext';
 import { NetworkStatus } from './components/NetworkStatus';
 import { OnboardingScreen } from './views/Onboarding/OnboardingScreen';
-import { 
-  useExercises, 
-  useWorkouts, 
-  useLogs, 
-  useProfile, 
-  useCreateWorkout, 
-  useCreateExercise, 
-  useLogWorkout 
+import { InteractiveTour } from './components/InteractiveTour';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useExercises,
+  useWorkouts,
+  useLogs,
+  useProfile,
+  useCreateWorkout,
+  useCreateExercise,
+  useLogWorkout
 } from './hooks/useSupabaseData';
 
 // Fallback Default Data
@@ -31,7 +33,10 @@ const AppContent = () => {
   const { user, loading: authLoading } = useAuth();
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [history, setHistory] = useState<ViewState[]>(['DASHBOARD']);
+  const [showTour, setShowTour] = useState(false);
   
+  const queryClient = useQueryClient();
+
   // Navigation State
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 
@@ -73,53 +78,53 @@ const AppContent = () => {
   ]);
   const [measurements, setMeasurements] = useState<MeasurementEntry[]>([]);
   const [weightGoal, setWeightGoal] = useState<WeightGoal>({
-      isActive: false,
-      startDate: null,
-      targetDate: null,
-      startWeight: null,
-      targetWeight: null,
+    isActive: false,
+    startDate: null,
+    targetDate: null,
+    startWeight: null,
+    targetWeight: null,
   });
 
   // --- DERIVED DATA ---
-  
+
   const fullExerciseLibrary = useMemo(() => {
-      if (!dbExercises || dbExercises.length === 0) return DEFAULT_EXERCISES;
-      return dbExercises;
+    if (!dbExercises || dbExercises.length === 0) return DEFAULT_EXERCISES;
+    return dbExercises;
   }, [dbExercises]);
 
   const completedWorkouts = dbLogs || [];
 
   // Calculate Streak
   const currentStreak = useMemo(() => {
-      if (!completedWorkouts.length) return 0;
-      
-      const sortedDates: string[] = Array.from<string>(new Set(completedWorkouts.map((w: CompletedWorkout) => w.completedAt.split('T')[0])))
-        .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
+    if (!completedWorkouts.length) return 0;
 
-      let streak = 0;
-      const today = new Date().toISOString().split('T')[0];
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const sortedDates: string[] = Array.from<string>(new Set(completedWorkouts.map((w: CompletedWorkout) => w.completedAt.split('T')[0])))
+      .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
 
-      if (sortedDates[0] !== today && sortedDates[0] !== yesterday) {
-          return 0;
+    let streak = 0;
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    if (sortedDates[0] !== today && sortedDates[0] !== yesterday) {
+      return 0;
+    }
+
+    let currentDate = new Date(sortedDates[0]);
+    streak++;
+
+    for (let i = 1; i < sortedDates.length; i++) {
+      const prevDate = new Date(sortedDates[i]);
+      const diffTime = Math.abs(currentDate.getTime() - prevDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        streak++;
+        currentDate = prevDate;
+      } else {
+        break;
       }
-
-      let currentDate = new Date(sortedDates[0]);
-      streak++;
-
-      for (let i = 1; i < sortedDates.length; i++) {
-          const prevDate = new Date(sortedDates[i]);
-          const diffTime = Math.abs(currentDate.getTime() - prevDate.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-
-          if (diffDays === 1) {
-              streak++;
-              currentDate = prevDate;
-          } else {
-              break;
-          }
-      }
-      return streak;
+    }
+    return streak;
   }, [completedWorkouts]);
 
   const userProfile: UserProfile = dbProfile || {
@@ -132,20 +137,62 @@ const AppContent = () => {
     hasCompletedOnboarding: false
   };
 
+  // --- TOUR CHECK (MOVED HERE - BEFORE GATES) ---
+  useEffect(() => {
+    const shouldShowTour = localStorage.getItem('auragym_show_tour');
+    if (shouldShowTour === 'true') {
+      localStorage.removeItem('auragym_show_tour');
+      // Delay to ensure DOM is ready
+      setTimeout(() => setShowTour(true), 1500);
+    }
+  }, []);
+
   // --- AUTH & LOADING GATES ---
 
-  if (authLoading || profileLoading) return <LoadingSpinner />;
+  if (authLoading) return <LoadingSpinner />;
+  // Only show spinner for profile loading if we don't have cached data (to avoid flicker)
+  if (profileLoading && !dbProfile) return <LoadingSpinner />;
   if (!user) return <AuthScreen />;
+
+  // --- ONBOARDING FINISH HANDLER ---
+  const handleOnboardingFinish = async () => {
+      console.log("Finishing onboarding...");
+      
+      // 1. Optimistic Update: Immediately update cache so the Gate passes
+      if (dbProfile) {
+          queryClient.setQueryData(['profile'], {
+              ...dbProfile,
+              hasCompletedOnboarding: true,
+              // Ensure we don't block on goal check either
+              goal: dbProfile.goal || 'General Fitness'
+          });
+      }
+
+      // 2. Background Refetch: Ensure data is synced with DB
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      
+      // 3. Set Flag for Tour (Effect at top will pick this up on next reload, 
+      // but since we are already mounted, we set state directly here too)
+      localStorage.removeItem('auragym_show_tour'); 
+      
+      // 4. Ensure we are on dashboard
+      setCurrentView('DASHBOARD');
+
+      // 5. Activate Tour with a safer delay to allow Dashboard DOM to mount fully
+      setTimeout(() => {
+          setShowTour(true);
+      }, 1000);
+  };
 
   // --- ONBOARDING GATE ---
   // If user exists (auth checked), but profile says incomplete, show wizard.
   // We use dbProfile directly to avoid flashing if default fallback is used briefly.
   if (dbProfile && (!dbProfile.hasCompletedOnboarding || !dbProfile.goal)) {
-      return <OnboardingScreen user={dbProfile} onFinish={() => window.location.reload()} />;
+    return <OnboardingScreen user={dbProfile} onFinish={handleOnboardingFinish} />;
   }
 
   // --- NAVIGATION HANDLERS ---
-  
+
   const handleNavigate = (view: ViewState) => {
     if (view === currentView) return;
     setHistory(prev => [...prev, view]);
@@ -155,7 +202,7 @@ const AppContent = () => {
   const handleBack = () => {
     if (history.length <= 1) return;
     const newHistory = [...history];
-    newHistory.pop(); 
+    newHistory.pop();
     const prevView = newHistory[newHistory.length - 1];
     setHistory(newHistory);
     setCurrentView(prevView);
@@ -180,32 +227,33 @@ const AppContent = () => {
   const renderView = () => {
     switch (currentView) {
       case 'ONBOARDING':
-        return <OnboardingScreen user={userProfile} onFinish={() => handleNavigate('DASHBOARD')} />;
+        // This case might be reached if state is manually set
+        return <OnboardingScreen user={userProfile} onFinish={handleOnboardingFinish} />;
       case 'DASHBOARD':
         return (
-          <DashboardView 
+          <DashboardView
             userProfile={userProfile}
             stats={{
-                ...localStats, 
-                waterConsumed: waterIntake,
-                workoutsCompleted: completedWorkouts.length,
-                streakDays: currentStreak
-            }} 
-            onNavigate={handleNavigate} 
+              ...localStats,
+              waterConsumed: waterIntake,
+              workoutsCompleted: completedWorkouts.length,
+              streakDays: currentStreak
+            }}
+            onNavigate={handleNavigate}
           />
         );
       case 'WORKOUTS':
         return (
-          <WorkoutsView 
-            plans={dbWorkouts || []} 
+          <WorkoutsView
+            plans={dbWorkouts || []}
             programs={programs}
             customExercises={fullExerciseLibrary}
-            onAddPlan={handleAddPlan} 
+            onAddPlan={handleAddPlan}
             onAddProgram={(p) => setPrograms([p, ...programs])}
             onUpdateProgram={(p) => setPrograms(prev => prev.map(pr => pr.id === p.id ? p : pr))}
             onAddCustomExercise={handleAddCustomExercise}
-            onUpdateCustomExercise={() => {}} 
-            onDeleteCustomExercise={() => {}} 
+            onUpdateCustomExercise={() => { }}
+            onDeleteCustomExercise={() => { }}
             onCompleteSession={handleCompleteSession}
             completedWorkouts={completedWorkouts}
             exerciseHistory={[]}
@@ -224,11 +272,11 @@ const AppContent = () => {
         );
       case 'EXERCISE_DETAIL':
         if (!selectedExercise) {
-           handleNavigate('EXERCISE_LIBRARY');
-           return null;
+          handleNavigate('EXERCISE_LIBRARY');
+          return null;
         }
         return (
-          <ExerciseDetailScreen 
+          <ExerciseDetailScreen
             exercise={selectedExercise}
             history={[]}
             onBack={handleBack}
@@ -236,12 +284,12 @@ const AppContent = () => {
         );
       case 'BODY':
         return (
-          <BodyView 
-            weightHistory={weightHistory} 
-            measurements={measurements} 
+          <BodyView
+            weightHistory={weightHistory}
+            measurements={measurements}
             onLogMeasurement={(t, v, u) => {
-                if (t === 'Weight') setWeightHistory([...weightHistory, { date: new Date().toISOString(), weight: v }]);
-                else setMeasurements([...measurements, { id: Date.now().toString(), date: new Date().toISOString(), type: t, value: v, unit: u }]);
+              if (t === 'Weight') setWeightHistory([...weightHistory, { date: new Date().toISOString(), weight: v }]);
+              else setMeasurements([...measurements, { id: Date.now().toString(), date: new Date().toISOString(), type: t, value: v, unit: u }]);
             }}
             weightGoal={weightGoal}
             onUpdateWeightGoal={setWeightGoal}
@@ -250,43 +298,43 @@ const AppContent = () => {
         );
       case 'FOOD':
         return (
-          <FoodView 
-            recipes={recipes} 
-            onAddRecipe={(r) => setRecipes([r, ...recipes])} 
-            waterConsumed={waterIntake} 
-            onUpdateWater={setWaterIntake} 
+          <FoodView
+            recipes={recipes}
+            onAddRecipe={(r) => setRecipes([r, ...recipes])}
+            waterConsumed={waterIntake}
+            onUpdateWater={setWaterIntake}
             foodLog={foodLog}
             onQuickLog={(c, p, ca, f, n, m, id) => {
-                const entry: FoodLogEntry = {
-                    id: Date.now().toString(), date: new Date().toISOString().split('T')[0],
-                    name: n, calories: c, protein: p, carbs: ca, fats: f, mealType: m, fdcId: id
-                };
-                setFoodLog([entry, ...foodLog]);
-                setLocalStats(prev => ({ ...prev, caloriesConsumed: prev.caloriesConsumed + c, proteinConsumed: prev.proteinConsumed + p }));
+              const entry: FoodLogEntry = {
+                id: Date.now().toString(), date: new Date().toISOString().split('T')[0],
+                name: n, calories: c, protein: p, carbs: ca, fats: f, mealType: m, fdcId: id
+              };
+              setFoodLog([entry, ...foodLog]);
+              setLocalStats(prev => ({ ...prev, caloriesConsumed: prev.caloriesConsumed + c, proteinConsumed: prev.proteinConsumed + p }));
             }}
-            onLogRecipeToToday={() => {}}
+            onLogRecipeToToday={() => { }}
             macroTargets={macroTargets}
             onUpdateTargets={setMacroTargets}
           />
         );
       case 'MORE':
         return (
-          <MoreView 
-            user={userProfile} 
-            onUpdateUser={() => {}} 
+          <MoreView
+            user={userProfile}
+            onUpdateUser={() => { }}
           />
         );
       default:
         return (
-            <DashboardView 
-                userProfile={userProfile}
-                stats={{
-                    ...localStats, 
-                    workoutsCompleted: completedWorkouts.length,
-                    streakDays: currentStreak
-                }} 
-                onNavigate={handleNavigate} 
-            />
+          <DashboardView
+            userProfile={userProfile}
+            stats={{
+              ...localStats,
+              workoutsCompleted: completedWorkouts.length,
+              streakDays: currentStreak
+            }}
+            onNavigate={handleNavigate}
+          />
         );
     }
   };
@@ -297,13 +345,18 @@ const AppContent = () => {
       {/* Content Scroll Wrapper */}
       <div className="h-screen overflow-y-auto no-scrollbar pb-safe">
         <div className="mx-auto max-w-md px-4 min-h-full">
-           {renderView()}
+          {renderView()}
         </div>
       </div>
 
       {/* Bottom Nav (Hidden during onboarding) */}
-      {currentView !== 'ONBOARDING' && (
+      {currentView !== 'ONBOARDING' && !((dbProfile && (!dbProfile.hasCompletedOnboarding || !dbProfile.goal))) && (
         <Navigation currentView={currentView} setView={handleNavigate} />
+      )}
+
+      {/* Interactive Tour */}
+      {showTour && (
+        <InteractiveTour onComplete={() => setShowTour(false)} />
       )}
 
     </div>

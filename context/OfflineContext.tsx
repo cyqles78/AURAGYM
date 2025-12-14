@@ -25,7 +25,7 @@ const OfflineContext = createContext<OfflineContextType>({
     isSyncing: false,
 });
 
-export const OfflineProvider = ({ children }: { children: React.ReactNode }) => {
+export const OfflineProvider = ({ children }: { children?: React.ReactNode }) => {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [queue, setQueue] = useState<OfflineAction[]>(() => {
         try {

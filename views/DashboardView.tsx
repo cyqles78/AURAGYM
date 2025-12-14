@@ -37,37 +37,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ userProfile, stats
         <div 
             onClick={() => onNavigate('MORE')}
             className="h-10 w-10 rounded-full bg-surfaceHighlight border border-border flex items-center justify-center cursor-pointer hover:bg-white/10 transition"
+            data-tour="profile"
         >
              <span className="text-xs font-bold text-white">{initials || 'ME'}</span>
         </div>
       </div>
 
       {/* Main Stats Card */}
-      <GlassCard className="group" onClick={() => onNavigate('WORKOUTS')}>
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center space-x-2">
-             <div className="p-1.5 bg-white text-black rounded-lg">
-                <Flame size={18} fill="currentColor" />
-             </div>
-             <span className="text-sm font-bold text-white">Active Streak</span>
+      <div data-tour="stats">
+        <GlassCard className="group" onClick={() => onNavigate('WORKOUTS')}>
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-white text-black rounded-lg">
+                  <Flame size={18} fill="currentColor" />
+              </div>
+              <span className="text-sm font-bold text-white">Active Streak</span>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-white">{stats.streakDays}</span>
+              <span className="text-xs text-secondary ml-1">Days</span>
+            </div>
           </div>
-          <div className="text-right">
-             <span className="text-2xl font-bold text-white">{stats.streakDays}</span>
-             <span className="text-xs text-secondary ml-1">Days</span>
+          
+          <div className="space-y-2">
+              <div className="flex justify-between text-xs text-secondary font-medium">
+                  <span>Workouts Completed</span>
+                  <span>{stats.workoutsCompleted}</span>
+              </div>
+              <div className="h-2 w-full bg-surfaceHighlight rounded-full overflow-hidden">
+                  {/* Visual placeholder for weekly goal progress */}
+                  <div className="h-full w-[65%] bg-white rounded-full"></div>
+              </div>
           </div>
-        </div>
-        
-        <div className="space-y-2">
-             <div className="flex justify-between text-xs text-secondary font-medium">
-                 <span>Workouts Completed</span>
-                 <span>{stats.workoutsCompleted}</span>
-             </div>
-             <div className="h-2 w-full bg-surfaceHighlight rounded-full overflow-hidden">
-                {/* Visual placeholder for weekly goal progress */}
-                <div className="h-full w-[65%] bg-white rounded-full"></div>
-             </div>
-        </div>
-      </GlassCard>
+        </GlassCard>
+      </div>
 
       {/* Quick Actions Grid */}
       <div className="grid grid-cols-2 gap-4">
@@ -95,7 +98,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ userProfile, stats
       </div>
 
       {/* Activity Chart Area */}
-      <div className="space-y-3">
+      <div className="space-y-3" data-tour="history">
         <div className="flex justify-between items-center px-1">
           <h3 className="text-lg font-bold text-white">Activity</h3>
         </div>
