@@ -2,7 +2,10 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#000000" />
     <title>AURAGYM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,28 +19,56 @@
             },
             colors: {
               background: '#000000',
-              surface: '#1C1C1E', // iOS Dark Mode Card
+              surface: '#1C1C1E',
               surfaceHighlight: '#2C2C2E',
               primary: '#FFFFFF',
               secondary: '#8E8E93',
-              accent: '#FFFFFF', // Monochrome accent
-              accentBlue: '#0A84FF', // iOS Blue for specific actions
-              accentGreen: '#30D158', // iOS Green for success
+              accent: '#FFFFFF',
+              accentBlue: '#0A84FF',
+              accentGreen: '#30D158',
               border: '#2C2C2E',
             },
+            spacing: {
+              'safe-top': 'env(safe-area-inset-top)',
+              'safe-bottom': 'env(safe-area-inset-bottom)',
+              'safe-left': 'env(safe-area-inset-left)',
+              'safe-right': 'env(safe-area-inset-right)',
+            },
             boxShadow: {
-              'card': '0 4px 12px rgba(0,0,0,0.5)',
+              'card': '0 2px 8px rgba(0,0,0,0.4)',
             }
           },
         },
       }
     </script>
     <style>
+      /* Mobile-First Base Styles */
+      * {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      html {
+        font-size: 16px;
+        height: 100%;
+        overflow: hidden;
+      }
+
       body {
         background-color: #000000;
         color: #FFFFFF;
         -webkit-tap-highlight-color: transparent;
-        overscroll-behavior-y: none; /* Prevent rubber-banding on iOS */
+        overscroll-behavior: none;
+        touch-action: pan-y;
+        height: 100%;
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+      }
+
+      #root {
+        height: 100%;
+        overflow: hidden;
       }
       
       /* Mobile Safe Areas */
@@ -48,7 +79,10 @@
         padding-bottom: env(safe-area-inset-bottom);
       }
       .pb-safe {
-        padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+        padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
+      }
+      .mb-nav {
+        margin-bottom: calc(env(safe-area-inset-bottom) + 72px);
       }
 
       /* Hide scrollbar for cleaner UI */
@@ -56,10 +90,11 @@
         display: none;
       }
       .no-scrollbar {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
 
+      /* Mobile-optimized card */
       .matte-card {
         background-color: #1C1C1E;
         border: 1px solid #2C2C2E;
@@ -67,29 +102,43 @@
       
       /* Glassmorphism utilities */
       .glass-panel {
-        background: rgba(28, 28, 30, 0.75);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(28, 28, 30, 0.85);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      /* Touch-friendly minimum sizes */
+      button, a, [role="button"] {
+        min-height: 44px;
+        min-width: 44px;
+      }
+
+      /* Smooth scrolling for mobile */
+      .mobile-scroll {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+      }
+
+      /* Prevent text selection on interactive elements */
+      button, .no-select {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      /* Optimize for mobile animations */
+      @media (prefers-reduced-motion: no-preference) {
+        .animate-in {
+          animation-duration: 0.2s;
+        }
+      }
+
+      /* Mobile input optimization */
+      input, textarea, select {
+        font-size: 16px !important; /* Prevents zoom on iOS */
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "recharts": "https://esm.sh/recharts@^3.5.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.87.1",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "@tanstack/react-query": "https://esm.sh/@tanstack/react-query@^5.90.12",
-    "@tanstack/react-query-persist-client": "https://esm.sh/@tanstack/react-query-persist-client@^5.90.12",
-    "@tanstack/query-sync-storage-persister": "https://esm.sh/@tanstack/query-sync-storage-persister@^5.90.12"
-  }
-}
-</script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

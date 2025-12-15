@@ -357,7 +357,7 @@ export const MoreView: React.FC<MoreViewProps> = ({ user: initialUser, onUpdateU
 
             {/* LOGOUT MODAL */}
             {showLogoutConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 pb-28 animate-in fade-in">
                     <div className="w-full max-w-xs bg-[#10121A] rounded-2xl border border-white/10 p-6 text-center">
                         <h3 className="text-lg font-bold text-white mb-2">Log Out?</h3>
                         <p className="text-sm text-slate-400 mb-6">Are you sure you want to sign out of your account?</p>

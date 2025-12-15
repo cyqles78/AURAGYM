@@ -10,16 +10,16 @@ interface GlassCardProps {
 
 export const GlassCard: React.FC<GlassCardProps> = ({ children, className = '', onClick, accent = false, style }) => {
   return (
-    <div 
+    <div
       onClick={onClick}
       className={`
-        matte-card rounded-[20px] p-5
-        transition-transform duration-200 ease-out
-        ${onClick ? 'cursor-pointer active:scale-[0.98]' : ''}
+        matte-card rounded-[16px] p-4
+        transition-all duration-150 ease-out
+        ${onClick ? 'cursor-pointer active:scale-[0.98] active:opacity-90' : ''}
         ${className}
       `}
       style={{
-        boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         ...style
       }}
     >

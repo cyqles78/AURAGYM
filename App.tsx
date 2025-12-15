@@ -35,7 +35,7 @@ const AppContent = () => {
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [history, setHistory] = useState<ViewState[]>(['DASHBOARD']);
   const [showTour, setShowTour] = useState(false);
-  
+
   const queryClient = useQueryClient();
 
   // Navigation State
@@ -71,15 +71,26 @@ const AppContent = () => {
   });
 
   const [waterIntake, setWaterIntake] = useState<number>(3);
-  
+
   // PERSISTED PROGRAMS
   const [programs, setPrograms] = usePersistentState<Program[]>('auragym_programs', []);
-  
+
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [foodLog, setFoodLog] = useState<FoodLogEntry[]>([]);
-  const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([
-    { date: '2023-01-01', weight: 85.0 }
-  ]);
+
+  // Initialize weight history from profile or empty
+  const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
+
+  // Initialize weight from profile when it loads
+  React.useEffect(() => {
+    if (dbProfile && dbProfile.currentWeight && weightHistory.length === 0) {
+      setWeightHistory([{
+        date: new Date().toISOString(),
+        weight: dbProfile.currentWeight
+      }]);
+    }
+  }, [dbProfile]);
+
   const [measurements, setMeasurements] = useState<MeasurementEntry[]>([]);
   const [weightGoal, setWeightGoal] = useState<WeightGoal>({
     isActive: false,
@@ -157,20 +168,20 @@ const AppContent = () => {
   if (!user) return <AuthScreen />;
 
   const handleOnboardingFinish = async () => {
-      console.log("Finishing onboarding...");
-      if (dbProfile) {
-          queryClient.setQueryData(['profile'], {
-              ...dbProfile,
-              hasCompletedOnboarding: true,
-              goal: dbProfile.goal || 'General Fitness'
-          });
-      }
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      localStorage.removeItem('auragym_show_tour'); 
-      setCurrentView('DASHBOARD');
-      setTimeout(() => {
-          setShowTour(true);
-      }, 1000);
+    console.log("Finishing onboarding...");
+    if (dbProfile) {
+      queryClient.setQueryData(['profile'], {
+        ...dbProfile,
+        hasCompletedOnboarding: true,
+        goal: dbProfile.goal || 'General Fitness'
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    localStorage.removeItem('auragym_show_tour');
+    setCurrentView('DASHBOARD');
+    setTimeout(() => {
+      setShowTour(true);
+    }, 1000);
   };
 
   if (dbProfile && (!dbProfile.hasCompletedOnboarding || !dbProfile.goal)) {
@@ -325,10 +336,10 @@ const AppContent = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-background font-sans text-primary safe-area-top safe-area-bottom">
+    <div className="relative h-full w-full bg-background font-sans text-primary overflow-hidden">
       <NetworkStatus />
-      <div className="h-screen overflow-y-auto no-scrollbar pb-safe">
-        <div className="mx-auto max-w-md px-4 min-h-full">
+      <div className="h-full overflow-y-auto no-scrollbar mobile-scroll pb-safe">
+        <div className="w-full px-3 min-h-full">
           {renderView()}
         </div>
       </div>
