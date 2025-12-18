@@ -2,17 +2,27 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { WorkoutPlan, Recipe, Program, ProgramDayProgressRequest, ProgramDayProgressResult, WeeklyMealPlan } from "../types";
+import { getOfflineRecipe } from "./offlineRecipes";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+// Get API key from Vite environment variable (browser-compatible)
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+// Check if we're online
+const isOnline = () => typeof navigator !== 'undefined' && navigator.onLine;
 
 export const generateAIWorkout = async (userGoal: string, level: string, equipment: string): Promise<WorkoutPlan | null> => {
-  if (!apiKey) {
-    console.error("API Key is missing");
+  if (!apiKey || !ai) {
+    console.warn("API Key is missing - AI features disabled");
     return null;
   }
 
-  const model = "gemini-2.5-flash";
+  if (!isOnline()) {
+    console.warn("Offline - AI features unavailable");
+    return null;
+  }
+
+  const model = "gemini-2.0-flash-exp";
   const prompt = `Create a detailed, high-quality workout plan for a ${level} level user with the goal of "${userGoal}". Available equipment: ${equipment}. 
   Includes specific sets, rep ranges, and rest times.
   Return a strictly valid JSON object.`;
@@ -46,13 +56,13 @@ export const generateAIWorkout = async (userGoal: string, level: string, equipme
                   sets: {
                     type: Type.ARRAY,
                     items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            id: { type: Type.STRING },
-                            reps: { type: Type.STRING },
-                            weight: { type: Type.STRING },
-                            completed: { type: Type.BOOLEAN }
-                        }
+                      type: Type.OBJECT,
+                      properties: {
+                        id: { type: Type.STRING },
+                        reps: { type: Type.STRING },
+                        weight: { type: Type.STRING },
+                        completed: { type: Type.BOOLEAN }
+                      }
                     }
                   }
                 }
@@ -76,38 +86,43 @@ export const generateAIWorkout = async (userGoal: string, level: string, equipme
 // --- EXERCISE SUGGESTION ---
 
 export const suggestExerciseDetails = async (exerciseName: string): Promise<{ targetMuscle: string, equipment: string } | null> => {
-    if (!apiKey || !exerciseName) return null;
-    
-    const model = "gemini-2.5-flash";
-    const prompt = `Identify the primary target muscle group and standard equipment needed for the exercise: "${exerciseName}".
+  if (!apiKey || !ai || !exerciseName) return null;
+
+  if (!isOnline()) {
+    console.warn("Offline - exercise suggestion unavailable");
+    return null;
+  }
+
+  const model = "gemini-2.0-flash-exp";
+  const prompt = `Identify the primary target muscle group and standard equipment needed for the exercise: "${exerciseName}".
     Return a strictly valid JSON object with 'targetMuscle' and 'equipment' fields.
     Use standard terms like 'Chest', 'Back', 'Legs', 'Barbell', 'Dumbbell', 'Bodyweight'.`;
 
-    try {
-        const response = await ai.models.generateContent({
-            model,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        targetMuscle: { type: Type.STRING },
-                        equipment: { type: Type.STRING }
-                    },
-                    required: ['targetMuscle', 'equipment']
-                }
-            }
-        });
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            targetMuscle: { type: Type.STRING },
+            equipment: { type: Type.STRING }
+          },
+          required: ['targetMuscle', 'equipment']
+        }
+      }
+    });
 
-        const text = response.text;
-        if (!text) return null;
-        return JSON.parse(text);
+    const text = response.text;
+    if (!text) return null;
+    return JSON.parse(text);
 
-    } catch (error) {
-        console.error("Error suggesting exercise details:", error);
-        return null;
-    }
+  } catch (error) {
+    console.error("Error suggesting exercise details:", error);
+    return null;
+  }
 };
 
 export interface RecipePreferences {
@@ -118,12 +133,19 @@ export interface RecipePreferences {
 }
 
 export const generateAIRecipe = async (prefs: RecipePreferences): Promise<Recipe | null> => {
-  if (!apiKey) {
-      console.error("API Key is missing");
-      return null;
+  // Check if API is available
+  if (!apiKey || !ai) {
+    console.warn("API Key is missing - using offline recipe template");
+    return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
   }
 
-  const model = "gemini-2.5-flash";
+  // Check if online
+  if (!isOnline()) {
+    console.warn("Offline - using offline recipe template");
+    return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
+  }
+
+  const model = "gemini-2.0-flash-exp";
   const prompt = `You are a Michelin-star fitness chef.
 
   Create ONE detailed RECIPE in JSON.
@@ -184,8 +206,11 @@ export const generateAIRecipe = async (prefs: RecipePreferences): Promise<Recipe
     });
 
     const text = response.text;
-    if (!text) return null;
-    
+    if (!text) {
+      console.warn("AI returned empty response - using offline template");
+      return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
+    }
+
     console.log("[AI Recipe raw JSON]", text);
     const recipe = JSON.parse(text) as Recipe;
 
@@ -195,33 +220,33 @@ export const generateAIRecipe = async (prefs: RecipePreferences): Promise<Recipe
     const lower = prefs.calories * 0.75;
     const upper = prefs.calories * 1.25;
     if (recipe.calories < lower || recipe.calories > upper) {
-       console.warn(`AI recipe calories (${recipe.calories}) out of range [${lower}-${upper}], adjusting.`);
-       recipe.calories = Math.round(Math.min(Math.max(recipe.calories, lower), upper));
+      console.warn(`AI recipe calories (${recipe.calories}) out of range [${lower}-${upper}], adjusting.`);
+      recipe.calories = Math.round(Math.min(Math.max(recipe.calories, lower), upper));
     }
 
     // 2. Ensure Required Ingredients
     if (prefs.ingredients && prefs.ingredients.length > 0) {
-        if (!recipe.ingredients) recipe.ingredients = [];
-        const existingIngs = recipe.ingredients.map(i => i.toLowerCase());
-        
-        for (const must of prefs.ingredients) {
-            const mustLower = must.toLowerCase();
-            // Check if any ingredient string contains the required ingredient
-            if (!existingIngs.some(i => i.includes(mustLower))) {
-                console.warn(`AI missed required ingredient: ${must}. Adding it.`);
-                recipe.ingredients.push(`${must} (added per request)`);
-            }
+      if (!recipe.ingredients) recipe.ingredients = [];
+      const existingIngs = recipe.ingredients.map(i => i.toLowerCase());
+
+      for (const must of prefs.ingredients) {
+        const mustLower = must.toLowerCase();
+        // Check if any ingredient string contains the required ingredient
+        if (!existingIngs.some(i => i.includes(mustLower))) {
+          console.warn(`AI missed required ingredient: ${must}. Adding it.`);
+          recipe.ingredients.push(`${must} (added per request)`);
         }
+      }
     }
 
     // 3. Validate Arrays
     if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length < 3) {
-        console.error("AI returned insufficient ingredients");
-        return null;
+      console.error("AI returned insufficient ingredients - using offline template");
+      return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
     }
     if (!Array.isArray(recipe.steps) || recipe.steps.length < 3) {
-        console.error("AI returned insufficient steps");
-        return null;
+      console.error("AI returned insufficient steps - using offline template");
+      return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
     }
 
     // 4. Defaults & Clean-up
@@ -238,7 +263,8 @@ export const generateAIRecipe = async (prefs: RecipePreferences): Promise<Recipe
 
   } catch (error) {
     console.error("Error generating recipe:", error);
-    return null;
+    console.warn("Falling back to offline recipe template");
+    return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
   }
 };
 
@@ -260,7 +286,7 @@ export const generateAIProgram = async (ctx: ProgramContextInput): Promise<Progr
   if (!apiKey) return null;
 
   const model = "gemini-2.5-flash"; // Using flash for larger context generation
-  
+
   // Revised prompt to be more explicit about structure requirements
   const prompt = `You are an expert strength coach.
 
@@ -326,7 +352,7 @@ export const generateAIProgram = async (ctx: ProgramContextInput): Promise<Progr
   4. Each Exercise.sets MUST contain 3–5 sets, with realistic reps (6–15) and weights (can be strings like "bodyweight" or "0" if unknown).
   5. Fill ALL fields with sensible values. Do NOT leave days or exercises empty.
   6. Return ONLY valid JSON matching this schema. No comments, no extra text.`;
-  
+
 
   try {
     const response = await ai.models.generateContent({
@@ -360,8 +386,8 @@ export const generateAIProgram = async (ctx: ProgramContextInput): Promise<Progr
                         focus: { type: Type.STRING },
                         sessionDuration: { type: Type.STRING },
                         exercises: {
-                           type: Type.ARRAY,
-                           items: {
+                          type: Type.ARRAY,
+                          items: {
                             type: Type.OBJECT,
                             properties: {
                               id: { type: Type.STRING },
@@ -373,17 +399,17 @@ export const generateAIProgram = async (ctx: ProgramContextInput): Promise<Progr
                               sets: {
                                 type: Type.ARRAY,
                                 items: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        id: { type: Type.STRING },
-                                        reps: { type: Type.STRING },
-                                        weight: { type: Type.STRING },
-                                        completed: { type: Type.BOOLEAN }
-                                    }
+                                  type: Type.OBJECT,
+                                  properties: {
+                                    id: { type: Type.STRING },
+                                    reps: { type: Type.STRING },
+                                    weight: { type: Type.STRING },
+                                    completed: { type: Type.BOOLEAN }
+                                  }
                                 }
                               }
                             }
-                           }
+                          }
                         }
                       }
                     }
@@ -398,26 +424,26 @@ export const generateAIProgram = async (ctx: ProgramContextInput): Promise<Progr
 
     const text = response.text;
     if (!text) return null;
-    
+
     console.log("[AI Program raw JSON]", text);
 
     const program = JSON.parse(text) as Program;
 
     // Validate structure: If weeks or days are missing, consider it a failed generation
     if (!program.weeks || program.weeks.length === 0) {
-        console.warn("AI returned no weeks");
-        return null;
+      console.warn("AI returned no weeks");
+      return null;
     }
 
     const hasEmptyDays = program.weeks.some(w => !w.days || w.days.length === 0);
     if (hasEmptyDays) {
-        console.warn("AI returned weeks with no days. Rejecting result.");
-        return null;
+      console.warn("AI returned weeks with no days. Rejecting result.");
+      return null;
     }
 
     if (ctx.programName) program.name = ctx.programName;
     program.createdAt = new Date().toISOString();
-    
+
     return program;
 
   } catch (error) {
@@ -478,13 +504,13 @@ export const generateProgressedProgramDay = async (req: ProgramDayProgressReques
                   sets: {
                     type: Type.ARRAY,
                     items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            id: { type: Type.STRING },
-                            reps: { type: Type.STRING },
-                            weight: { type: Type.STRING },
-                            completed: { type: Type.BOOLEAN }
-                        }
+                      type: Type.OBJECT,
+                      properties: {
+                        id: { type: Type.STRING },
+                        reps: { type: Type.STRING },
+                        weight: { type: Type.STRING },
+                        completed: { type: Type.BOOLEAN }
+                      }
                     }
                   }
                 }
@@ -607,22 +633,22 @@ export const generateMealPlan = async (goals: MealPlanInput): Promise<WeeklyMeal
 
     console.log("[AI Meal Plan raw JSON]", text);
     const plan = JSON.parse(text) as WeeklyMealPlan;
-    
+
     // Ensure IDs and dates
     if (!plan.planId) plan.planId = Date.now().toString();
     if (!plan.dateGenerated) plan.dateGenerated = new Date().toISOString();
 
     // Fill up to 7 days if AI only returned 3 to save tokens
     if (plan.days.length < 7 && plan.days.length > 0) {
-        const originalLength = plan.days.length;
-        let i = 0;
-        while (plan.days.length < 7) {
-            const dayToCopy = plan.days[i % originalLength];
-            const newDay = JSON.parse(JSON.stringify(dayToCopy)); // Deep copy
-            newDay.dayName = `Day ${plan.days.length + 1}`;
-            plan.days.push(newDay);
-            i++;
-        }
+      const originalLength = plan.days.length;
+      let i = 0;
+      while (plan.days.length < 7) {
+        const dayToCopy = plan.days[i % originalLength];
+        const newDay = JSON.parse(JSON.stringify(dayToCopy)); // Deep copy
+        newDay.dayName = `Day ${plan.days.length + 1}`;
+        plan.days.push(newDay);
+        i++;
+      }
     }
 
     return plan;

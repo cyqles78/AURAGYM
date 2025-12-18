@@ -574,7 +574,7 @@ export const WorkoutsView: React.FC<WorkoutsViewProps> = ({
 
                 {/* AI Progression Preview Modal */}
                 {(isProgressLoading || progressPreview) && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 pb-28 animate-in fade-in duration-200">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black backdrop-blur-2xl p-4 pb-28 animate-in fade-in duration-200">
                         {isProgressLoading ? (
                             <div className="bg-[#1C1C1E] rounded-2xl p-6 flex flex-col items-center">
                                 <Sparkles size={32} className="animate-spin text-accent mb-2" />

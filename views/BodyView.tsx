@@ -357,7 +357,7 @@ export const BodyView: React.FC<BodyViewProps> = ({
 
             {/* LOG MODAL */}
             {showLogModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pb-28 bg-black/95 backdrop-blur-xl animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pb-28 bg-black backdrop-blur-2xl animate-in fade-in duration-200">
                     <div className="bg-[#1C1C1E] w-full max-w-sm rounded-[24px] border border-border p-6 space-y-6 shadow-2xl max-h-[70vh] overflow-y-auto">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-bold text-white">Log Entry</h3>

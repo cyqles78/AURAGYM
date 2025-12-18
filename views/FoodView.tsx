@@ -565,7 +565,7 @@ export const FoodView: React.FC<FoodViewProps> = ({
 
             {/* --- WIZARD MODAL --- */}
             {showWizard && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 pb-28 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black backdrop-blur-2xl p-4 pb-28 animate-in fade-in duration-200">
                     <div className="w-full max-w-md bg-[#1C1C1E] rounded-[24px] border border-border p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-5">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -643,7 +643,7 @@ export const FoodView: React.FC<FoodViewProps> = ({
 
             {/* --- QUICK LOG MODAL --- */}
             {showQuickLog && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 pb-28 animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black backdrop-blur-2xl p-4 pb-28 animate-in fade-in">
                     <div className="w-full max-w-sm bg-[#1C1C1E] rounded-[24px] border border-border p-6 shadow-2xl max-h-[70vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-white">Quick Log</h2>
@@ -700,7 +700,7 @@ export const FoodView: React.FC<FoodViewProps> = ({
 
             {/* --- EDIT TARGETS MODAL --- */}
             {showEditTargets && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 pb-28 animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black backdrop-blur-2xl p-4 pb-28 animate-in fade-in">
                     <div className="w-full max-w-sm bg-[#1C1C1E] rounded-[24px] border border-border p-6 shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-white">Edit Targets</h2>
