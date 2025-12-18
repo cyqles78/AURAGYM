@@ -1,659 +1,101 @@
 
-
-import { GoogleGenAI, Type } from "@google/genai";
-import { WorkoutPlan, Recipe, Program, ProgramDayProgressRequest, ProgramDayProgressResult, WeeklyMealPlan } from "../types";
+import { 
+  WorkoutPlan, 
+  Recipe, 
+  Program, 
+  ProgramDayProgressRequest, 
+  ProgramDayProgressResult, 
+  WeeklyMealPlan, 
+  RecipePreferences, 
+  ProgramContextInput, 
+  MealPlanInput 
+} from "../types";
+import { AIService } from "./ai/AIService";
 import { getOfflineRecipe } from "./offlineRecipes";
 
-// Get API key from Vite environment variable (browser-compatible)
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+// Fix: Export types so that other modules (like FoodView, MealPlanGeneratorScreen, and useAI) can correctly import them from this service module
+export type { 
+  WorkoutPlan, 
+  Recipe, 
+  Program, 
+  ProgramDayProgressRequest, 
+  ProgramDayProgressResult, 
+  WeeklyMealPlan, 
+  RecipePreferences, 
+  ProgramContextInput, 
+  MealPlanInput 
+};
 
-// Check if we're online
-const isOnline = () => typeof navigator !== 'undefined' && navigator.onLine;
-
+/**
+ * AI-powered Workout Generation
+ */
 export const generateAIWorkout = async (userGoal: string, level: string, equipment: string): Promise<WorkoutPlan | null> => {
-  if (!apiKey || !ai) {
-    console.warn("API Key is missing - AI features disabled");
-    return null;
-  }
-
-  if (!isOnline()) {
-    console.warn("Offline - AI features unavailable");
-    return null;
-  }
-
-  const model = "gemini-2.0-flash-exp";
-  const prompt = `Create a detailed, high-quality workout plan for a ${level} level user with the goal of "${userGoal}". Available equipment: ${equipment}. 
-  Includes specific sets, rep ranges, and rest times.
-  Return a strictly valid JSON object.`;
-
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING },
-            title: { type: Type.STRING },
-            description: { type: Type.STRING },
-            duration: { type: Type.STRING },
-            difficulty: { type: Type.STRING, enum: ['Beginner', 'Intermediate', 'Advanced'] },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-            exercises: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING },
-                  name: { type: Type.STRING },
-                  targetMuscle: { type: Type.STRING },
-                  equipment: { type: Type.STRING },
-                  restTimeSeconds: { type: Type.INTEGER },
-                  notes: { type: Type.STRING },
-                  sets: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        id: { type: Type.STRING },
-                        reps: { type: Type.STRING },
-                        weight: { type: Type.STRING },
-                        completed: { type: Type.BOOLEAN }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) return null;
-    return JSON.parse(text) as WorkoutPlan;
-
+    return await AIService.generateWorkout(userGoal, level, equipment);
   } catch (error) {
-    console.error("Error generating workout:", error);
+    console.error("Failed to generate AI workout:", error);
     return null;
   }
 };
 
-// --- EXERCISE SUGGESTION ---
-
-export const suggestExerciseDetails = async (exerciseName: string): Promise<{ targetMuscle: string, equipment: string } | null> => {
-  if (!apiKey || !ai || !exerciseName) return null;
-
-  if (!isOnline()) {
-    console.warn("Offline - exercise suggestion unavailable");
-    return null;
-  }
-
-  const model = "gemini-2.0-flash-exp";
-  const prompt = `Identify the primary target muscle group and standard equipment needed for the exercise: "${exerciseName}".
-    Return a strictly valid JSON object with 'targetMuscle' and 'equipment' fields.
-    Use standard terms like 'Chest', 'Back', 'Legs', 'Barbell', 'Dumbbell', 'Bodyweight'.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            targetMuscle: { type: Type.STRING },
-            equipment: { type: Type.STRING }
-          },
-          required: ['targetMuscle', 'equipment']
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) return null;
-    return JSON.parse(text);
-
-  } catch (error) {
-    console.error("Error suggesting exercise details:", error);
-    return null;
-  }
-};
-
-export interface RecipePreferences {
-  mealType: string;
-  diet: string;
-  calories: number;
-  ingredients: string[];
-}
-
+/**
+ * AI-powered Recipe Generation with Offline Fallback
+ */
 export const generateAIRecipe = async (prefs: RecipePreferences): Promise<Recipe | null> => {
-  // Check if API is available
-  if (!apiKey || !ai) {
-    console.warn("API Key is missing - using offline recipe template");
-    return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
-  }
-
-  // Check if online
-  if (!isOnline()) {
-    console.warn("Offline - using offline recipe template");
-    return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
-  }
-
-  const model = "gemini-2.0-flash-exp";
-  const prompt = `You are a Michelin-star fitness chef.
-
-  Create ONE detailed RECIPE in JSON.
-
-  User preferences:
-  - Meal type: ${prefs.mealType}
-  - Diet style: ${prefs.diet}
-  - Target calories: about ${prefs.calories} kcal
-  - Must include ingredients: ${prefs.ingredients.join(", ") || "none (chef's choice)"}
-
-  Return a JSON object with this EXACT structure:
-
-  {
-    "id": "string",
-    "title": "string",
-    "calories": number,
-    "protein": number,
-    "carbs": number,
-    "fats": number,
-    "prepTime": "string",
-    "ingredients": string[],
-    "steps": string[],
-    "tags": string[]
-  }
-
-  Strict rules:
-  1. calories must be within about ±25% of ${prefs.calories}.
-  2. protein, carbs, fats must be realistic positive numbers.
-  3. ingredients must be a list of 4–15 human-readable ingredient strings (e.g. "200g Chicken Breast").
-  4. steps must be a list of 3–10 short instructions.
-  5. Include ALL 'must include' ingredients in the ingredients array.
-  6. tags must include: "${prefs.mealType}", "${prefs.diet}".
-  7. Respond with JSON ONLY, no extra commentary.`;
-
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING },
-            title: { type: Type.STRING },
-            calories: { type: Type.INTEGER },
-            protein: { type: Type.INTEGER },
-            carbs: { type: Type.INTEGER },
-            fats: { type: Type.INTEGER },
-            prepTime: { type: Type.STRING },
-            ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-            steps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ["title", "calories", "protein", "carbs", "fats", "ingredients", "steps"]
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) {
-      console.warn("AI returned empty response - using offline template");
-      return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
-    }
-
-    console.log("[AI Recipe raw JSON]", text);
-    const recipe = JSON.parse(text) as Recipe;
-
-    // --- Sanity Checks & Post-Processing ---
-
-    // 1. Validate Calories Range (±25%)
-    const lower = prefs.calories * 0.75;
-    const upper = prefs.calories * 1.25;
-    if (recipe.calories < lower || recipe.calories > upper) {
-      console.warn(`AI recipe calories (${recipe.calories}) out of range [${lower}-${upper}], adjusting.`);
-      recipe.calories = Math.round(Math.min(Math.max(recipe.calories, lower), upper));
-    }
-
-    // 2. Ensure Required Ingredients
-    if (prefs.ingredients && prefs.ingredients.length > 0) {
-      if (!recipe.ingredients) recipe.ingredients = [];
-      const existingIngs = recipe.ingredients.map(i => i.toLowerCase());
-
-      for (const must of prefs.ingredients) {
-        const mustLower = must.toLowerCase();
-        // Check if any ingredient string contains the required ingredient
-        if (!existingIngs.some(i => i.includes(mustLower))) {
-          console.warn(`AI missed required ingredient: ${must}. Adding it.`);
-          recipe.ingredients.push(`${must} (added per request)`);
-        }
-      }
-    }
-
-    // 3. Validate Arrays
-    if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length < 3) {
-      console.error("AI returned insufficient ingredients - using offline template");
-      return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
-    }
-    if (!Array.isArray(recipe.steps) || recipe.steps.length < 3) {
-      console.error("AI returned insufficient steps - using offline template");
-      return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
-    }
-
-    // 4. Defaults & Clean-up
-    if (!recipe.id) recipe.id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString());
-    if (!recipe.title) recipe.title = `${prefs.diet} ${prefs.mealType}`;
-    if (!recipe.prepTime) recipe.prepTime = "20 min";
-    if (!Array.isArray(recipe.tags)) recipe.tags = [];
-
-    // Ensure tags present
-    if (!recipe.tags.includes(prefs.mealType)) recipe.tags.push(prefs.mealType);
-    if (!recipe.tags.includes(prefs.diet)) recipe.tags.push(prefs.diet);
-
+    const recipe = await AIService.generateRecipe(prefs);
+    if (!recipe) throw new Error("AI returned empty recipe");
     return recipe;
-
   } catch (error) {
-    console.error("Error generating recipe:", error);
-    console.warn("Falling back to offline recipe template");
+    console.warn("AI Recipe generation failed, falling back to offline content:", error);
     return getOfflineRecipe(prefs.mealType, prefs.diet, prefs.calories);
   }
 };
 
-// --- PROGRAM GENERATION ---
-
-export interface ProgramContextInput {
-  goal: string;
-  level: string;
-  equipment: string[];
-  timePerSession: number;
-  constraints: string;
-  daysPerWeek: number;
-  durationWeeks: number;
-  splitStyle: string;
-  programName: string;
-}
-
+/**
+ * AI-powered Training Program Generation
+ */
 export const generateAIProgram = async (ctx: ProgramContextInput): Promise<Program | null> => {
-  if (!apiKey) return null;
-
-  const model = "gemini-2.5-flash"; // Using flash for larger context generation
-
-  // Revised prompt to be more explicit about structure requirements
-  const prompt = `You are an expert strength coach.
-
-  Design a fully detailed ${ctx.durationWeeks}-week training PROGRAM in JSON.
-  
-  User context:
-  - Goal: ${ctx.goal}
-  - Level: ${ctx.level}
-  - Split: ${ctx.splitStyle}
-  - Frequency: ${ctx.daysPerWeek} days per week
-  - Available equipment: ${ctx.equipment.join(", ") || "Bodyweight only"}
-  - Typical session length: ${ctx.timePerSession} minutes
-  - Constraints/injuries: ${ctx.constraints || "None"}
-  
-  Return a JSON object matching this structure exactly (property names and nesting):
-  
-  Program {
-    id: string
-    name: string
-    description: string
-    goal: string
-    durationWeeks: number
-    daysPerWeek: number
-    createdAt: string
-    weeks: ProgramWeek[]
-  }
-  
-  ProgramWeek {
-    number: number
-    days: ProgramDay[]
-  }
-  
-  ProgramDay {
-    id: string
-    name: string          // e.g. "Upper A", "Lower B"
-    focus: string         // e.g. "Chest & Triceps"
-    sessionDuration: string // e.g. "60 min"
-    exercises: Exercise[]
-  }
-  
-  Exercise {
-    id: string
-    name: string
-    targetMuscle: string
-    equipment: string
-    restTimeSeconds: number
-    notes: string
-    sets: WorkoutSet[]
-  }
-  
-  WorkoutSet {
-    id: string
-    reps: string
-    weight: string
-    completed: boolean
-  }
-  
-  STRICT RULES:
-  
-  1. weeks MUST contain exactly ${ctx.durationWeeks} items, with numbers 1..${ctx.durationWeeks}.
-  2. Each week.days MUST contain exactly ${ctx.daysPerWeek} days (no empty arrays).
-  3. Each ProgramDay.exercises MUST contain between 4 and 8 exercises (no empty arrays).
-  4. Each Exercise.sets MUST contain 3–5 sets, with realistic reps (6–15) and weights (can be strings like "bodyweight" or "0" if unknown).
-  5. Fill ALL fields with sensible values. Do NOT leave days or exercises empty.
-  6. Return ONLY valid JSON matching this schema. No comments, no extra text.`;
-
-
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING },
-            name: { type: Type.STRING },
-            description: { type: Type.STRING },
-            goal: { type: Type.STRING },
-            durationWeeks: { type: Type.INTEGER },
-            daysPerWeek: { type: Type.INTEGER },
-            createdAt: { type: Type.STRING },
-            weeks: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  number: { type: Type.INTEGER },
-                  days: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        id: { type: Type.STRING },
-                        name: { type: Type.STRING },
-                        focus: { type: Type.STRING },
-                        sessionDuration: { type: Type.STRING },
-                        exercises: {
-                          type: Type.ARRAY,
-                          items: {
-                            type: Type.OBJECT,
-                            properties: {
-                              id: { type: Type.STRING },
-                              name: { type: Type.STRING },
-                              targetMuscle: { type: Type.STRING },
-                              equipment: { type: Type.STRING },
-                              restTimeSeconds: { type: Type.INTEGER },
-                              notes: { type: Type.STRING },
-                              sets: {
-                                type: Type.ARRAY,
-                                items: {
-                                  type: Type.OBJECT,
-                                  properties: {
-                                    id: { type: Type.STRING },
-                                    reps: { type: Type.STRING },
-                                    weight: { type: Type.STRING },
-                                    completed: { type: Type.BOOLEAN }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) return null;
-
-    console.log("[AI Program raw JSON]", text);
-
-    const program = JSON.parse(text) as Program;
-
-    // Validate structure: If weeks or days are missing, consider it a failed generation
-    if (!program.weeks || program.weeks.length === 0) {
-      console.warn("AI returned no weeks");
-      return null;
-    }
-
-    const hasEmptyDays = program.weeks.some(w => !w.days || w.days.length === 0);
-    if (hasEmptyDays) {
-      console.warn("AI returned weeks with no days. Rejecting result.");
-      return null;
-    }
-
-    if (ctx.programName) program.name = ctx.programName;
-    program.createdAt = new Date().toISOString();
-
-    return program;
-
+    return await AIService.generateProgram(ctx);
   } catch (error) {
-    console.error("Error generating program:", error);
+    console.error("Failed to generate AI program:", error);
     return null;
   }
 };
 
-// --- PROGRESSION GENERATION ---
-
+/**
+ * Progressive Overload AI Adjustment
+ */
 export const generateProgressedProgramDay = async (req: ProgramDayProgressRequest): Promise<ProgramDayProgressResult | null> => {
-  if (!apiKey) return null;
-
-  const model = "gemini-2.5-flash";
-  const prompt = `Act as an expert strength coach. Adjust this workout day based on recent performance history to ensure progressive overload.
-  
-  Context:
-  - Program: ${req.programId}
-  - Week: ${req.weekNumber}
-  - Day: ${req.dayName} (${req.goal})
-  
-  Exercises & History:
-  ${JSON.stringify(req.exercises, null, 2)}
-  
-  Rules:
-  1. If performance is consistent/improving (good 1RM, completed sets), apply progressive overload (increase weight 2.5-5%, OR +1 rep, OR +1 set).
-  2. If performance stalled/regressed, maintain or slightly reduce volume/intensity (deload).
-  3. If NO history is provided (empty recentPerformances), assume this is a standard linear progression for the next session. You MUST make a slight adjustment to indicate progression (e.g. increase reps by 1-2, or increase weight by 2.5%, or add 1 set).
-  4. Do NOT return the exact same values as the current prescription. The user requested an adjustment, so you must provide a logical progression.
-  5. Keep the same exercise names unless a variation is absolutely necessary.
-  
-  Return strictly valid JSON matching ProgramDayProgressResult.`;
-
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            dayId: { type: Type.STRING },
-            name: { type: Type.STRING },
-            focus: { type: Type.STRING },
-            sessionDuration: { type: Type.STRING },
-            exercises: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING },
-                  name: { type: Type.STRING },
-                  targetMuscle: { type: Type.STRING },
-                  equipment: { type: Type.STRING },
-                  restTimeSeconds: { type: Type.INTEGER },
-                  notes: { type: Type.STRING },
-                  sets: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        id: { type: Type.STRING },
-                        reps: { type: Type.STRING },
-                        weight: { type: Type.STRING },
-                        completed: { type: Type.BOOLEAN }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) return null;
-    return JSON.parse(text) as ProgramDayProgressResult;
-
+    return await AIService.generateProgressedDay(req);
   } catch (error) {
-    console.error("Error generating progression:", error);
+    console.error("Failed to calculate AI progression:", error);
     return null;
   }
 };
 
-// --- MEAL PLAN GENERATION ---
-
-export interface MealPlanInput {
-  calories: number;
-  protein: number;
-  restrictions: string;
-}
-
+/**
+ * AI Weekly Meal Planning
+ */
 export const generateMealPlan = async (goals: MealPlanInput): Promise<WeeklyMealPlan | null> => {
-  if (!apiKey) return null;
-
-  const model = "gemini-2.5-flash";
-  // We request only 3 days to safely stay within token limits of the model
-  // We will programmatically cycle Day 1-3 to fill the week to 7 days.
-  const prompt = `Act as an expert nutritionist and chef. Create a MEAL PLAN for 3 DAYS based on the following:
-  
-  Target: ~${goals.calories} kcal, ~${goals.protein}g protein/day.
-  Restrictions: ${goals.restrictions || "None"}.
-  
-  REQUIREMENTS:
-  1. Generate exactly 3 distinct days.
-  2. Each day must have 3-4 meal entries (Breakfast, Lunch, Dinner, Snack).
-  3. Use common, healthy ingredients.
-  4. CRITICAL: List ONLY the top 5 main ingredients per meal. Strings must be formatted as "Quantity Unit Ingredient" (e.g. "200g Chicken Breast", "2 slices Bread", "1 Cup Rice").
-  5. JSON ONLY response.
-  
-  Return a strictly valid JSON object matching this structure:
-  {
-    "planId": "string",
-    "dateGenerated": "string",
-    "days": [
-      {
-        "dayName": "string",
-        "meals": [
-          {
-            "mealType": "Breakfast" | "Lunch" | "Dinner" | "Snack",
-            "recipeName": "string",
-            "preparationTimeMinutes": number,
-            "recipeDetails": {
-               "calories": number,
-               "protein": number,
-               "carbs": number,
-               "fats": number
-            },
-            "ingredients": ["string"]
-          }
-        ]
-      }
-    ]
-  }`;
-
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            planId: { type: Type.STRING },
-            dateGenerated: { type: Type.STRING },
-            days: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  dayName: { type: Type.STRING },
-                  meals: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        mealType: { type: Type.STRING, enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'] },
-                        recipeName: { type: Type.STRING },
-                        preparationTimeMinutes: { type: Type.INTEGER },
-                        recipeDetails: {
-                          type: Type.OBJECT,
-                          properties: {
-                            calories: { type: Type.INTEGER },
-                            protein: { type: Type.INTEGER },
-                            carbs: { type: Type.INTEGER },
-                            fats: { type: Type.INTEGER }
-                          }
-                        },
-                        ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) return null;
-
-    console.log("[AI Meal Plan raw JSON]", text);
-    const plan = JSON.parse(text) as WeeklyMealPlan;
-
-    // Ensure IDs and dates
-    if (!plan.planId) plan.planId = Date.now().toString();
-    if (!plan.dateGenerated) plan.dateGenerated = new Date().toISOString();
-
-    // Fill up to 7 days if AI only returned 3 to save tokens
-    if (plan.days.length < 7 && plan.days.length > 0) {
-      const originalLength = plan.days.length;
-      let i = 0;
-      while (plan.days.length < 7) {
-        const dayToCopy = plan.days[i % originalLength];
-        const newDay = JSON.parse(JSON.stringify(dayToCopy)); // Deep copy
-        newDay.dayName = `Day ${plan.days.length + 1}`;
-        plan.days.push(newDay);
-        i++;
-      }
-    }
-
-    return plan;
+    return await AIService.generateMealPlan(goals);
   } catch (error) {
-    console.error("Error generating meal plan:", error);
+    console.error("Failed to generate AI meal plan:", error);
+    return null;
+  }
+};
+
+/**
+ * AI Exercise Enrichment (Details for custom exercises)
+ */
+export const suggestExerciseDetails = async (name: string): Promise<{ targetMuscle: string; equipment: string } | null> => {
+  try {
+    return await AIService.suggestExerciseDetails(name);
+  } catch (error) {
+    console.error("Failed to suggest exercise details:", error);
     return null;
   }
 };

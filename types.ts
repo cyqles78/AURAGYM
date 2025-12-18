@@ -309,7 +309,32 @@ export interface MetricSummary {
   allTimeHigh: number;
 }
 
-// --- AI MEAL PLANNING ---
+// --- AI INTERFACES ---
+
+export interface RecipePreferences {
+  mealType: string;
+  diet: string;
+  calories: number;
+  ingredients: string[];
+}
+
+export interface MealPlanInput {
+  calories: number;
+  protein: number;
+  restrictions: string;
+}
+
+export interface ProgramContextInput {
+  goal: string;
+  level: string;
+  equipment: string[];
+  timePerSession: number;
+  constraints: string;
+  daysPerWeek: number;
+  durationWeeks: number;
+  splitStyle: string;
+  programName: string;
+}
 
 export interface RecipeSummary {
   calories: number;
