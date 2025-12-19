@@ -1,4 +1,5 @@
-/// <reference types="vite/client" />
+// Fix: Removed problematic triple-slash reference to 'vite/client' which was not found
+// The interfaces below provide sufficient typing for the custom environment variables.
 
 interface ImportMetaEnv {
     readonly VITE_GEMINI_API_KEY: string

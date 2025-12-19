@@ -17,7 +17,12 @@
     "react": "^19.2.3",
     "@tanstack/query-sync-storage-persister": "^5.90.14",
     "@tanstack/react-query-persist-client": "^5.90.14",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "@google/generative-ai": "^0.24.1",
+    "path": "^0.12.7",
+    "vite": "^7.3.0",
+    "@vitejs/plugin-react": "^5.1.2",
+    "url": "^0.11.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

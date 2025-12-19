@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+// Fix: Using the correct @google/genai library and following the updated initialization and generation patterns
+import { GoogleGenAI, Type } from "@google/genai";
 import {
     Recipe,
     WorkoutPlan,
@@ -13,21 +14,16 @@ import {
 import { IAIService, AIError } from './types';
 
 export class GeminiAdapter implements IAIService {
-    private apiKey: string;
-    private model: GoogleGenerativeAI;
-
-    constructor() {
-        // Use Vite's import.meta.env for environment variables
-        this.apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-        this.model = new GoogleGenerativeAI(this.apiKey);
-    }
+    // Fix: Guideline requires using process.env.API_KEY exclusively.
+    // Fix: Initialization is performed within each method to ensure the most up-to-date key is used.
 
     private async generate<T>(
         modelName: string,
         prompt: string,
         schema?: any
     ): Promise<T | null> {
-        if (!this.apiKey) {
+        // Fix: Ensure process.env.API_KEY is used directly.
+        if (!process.env.API_KEY) {
             throw new AIError(
                 "Gemini API key not configured",
                 "NO_API_KEY",
@@ -36,19 +32,23 @@ export class GeminiAdapter implements IAIService {
         }
 
         try {
-            const generativeModel = this.model.getGenerativeModel({
+            // Fix: Create a new GoogleGenAI instance right before making an API call.
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            
+            // Fix: Use ai.models.generateContent directly with model name and contents.
+            // Fix: Do not define model first and call generate content later.
+            const response = await ai.models.generateContent({
                 model: modelName,
-                generationConfig: schema ? {
+                contents: prompt,
+                config: {
                     responseMimeType: "application/json",
+                    // Fix: Use Type from @google/genai for the schema if provided.
                     responseSchema: schema,
-                } : {
-                    responseMimeType: "application/json",
                 }
             });
 
-            const result = await generativeModel.generateContent(prompt);
-            const response = result.response;
-            const text = response.text();
+            // Fix: Access .text property directly (not a method).
+            const text = response.text;
 
             if (!text) {
                 throw new AIError("Empty response from AI", "EMPTY_RESPONSE", true);
@@ -111,7 +111,8 @@ Return ONLY valid JSON matching this structure:
   "tags": ["tag1", "tag2"]
 }`;
 
-        return this.generate<Recipe>("gemini-2.5-flash", prompt);
+        // Fix: Use gemini-3-flash-preview for Basic Text Tasks as recommended.
+        return this.generate<Recipe>("gemini-3-flash-preview", prompt);
     }
 
     async generateWorkout(userGoal: string, level: string, equipment: string): Promise<WorkoutPlan | null> {
@@ -139,7 +140,8 @@ Return ONLY valid JSON matching this structure:
   "tags": ["tag1", "tag2"]
 }`;
 
-        return this.generate<WorkoutPlan>("gemini-2.5-flash", prompt);
+        // Fix: Use gemini-3-flash-preview for Basic Text Tasks as recommended.
+        return this.generate<WorkoutPlan>("gemini-3-flash-preview", prompt);
     }
 
     async generateMealPlan(goals: MealPlanInput): Promise<WeeklyMealPlan | null> {
@@ -181,7 +183,8 @@ Return ONLY valid JSON matching this structure:
   ]
 }`;
 
-        return this.generate<WeeklyMealPlan>("gemini-2.5-flash", prompt);
+        // Fix: Use gemini-3-flash-preview for Basic Text Tasks as recommended.
+        return this.generate<WeeklyMealPlan>("gemini-3-flash-preview", prompt);
     }
 
     async generateProgram(ctx: ProgramContextInput): Promise<Program | null> {
@@ -206,7 +209,8 @@ Provide a complete program with:
 
 Return ONLY valid JSON matching the Program type structure.`;
 
-        return this.generate<Program>("gemini-2.5-flash", prompt);
+        // Fix: Use gemini-3-pro-preview for Complex Text Tasks as recommended.
+        return this.generate<Program>("gemini-3-pro-preview", prompt);
     }
 
     async generateProgressedDay(req: ProgramDayProgressRequest): Promise<ProgramDayProgressResult | null> {
@@ -223,7 +227,8 @@ Based on recent performances, suggest:
 
 Return ONLY valid JSON matching the ProgramDayProgressResult type structure.`;
 
-        return this.generate<ProgramDayProgressResult>("gemini-2.5-flash", prompt);
+        // Fix: Use gemini-3-flash-preview for text generation tasks.
+        return this.generate<ProgramDayProgressResult>("gemini-3-flash-preview", prompt);
     }
 
     async suggestExerciseDetails(name: string): Promise<{ targetMuscle: string; equipment: string } | null> {
@@ -238,32 +243,36 @@ Return ONLY valid JSON with this exact structure:
 Use these muscle groups: Chest, Back, Quads, Hamstrings, Glutes, Calves, Shoulders, Triceps, Biceps, Forearms, Abs, Cardio, Full Body, Other
 Use these equipment types: Barbell, Dumbbell, Machine, Cable, Bodyweight, Kettlebell, Band, Smith Machine, Cardio Machine, Other`;
 
+        // Fix: Correct property Type from correct @google/genai library.
         const schema = {
-            type: SchemaType.OBJECT,
+            type: Type.OBJECT,
             properties: {
                 targetMuscle: {
-                    type: SchemaType.STRING,
+                    type: Type.STRING,
                     description: "Primary muscle group targeted"
                 },
                 equipment: {
-                    type: SchemaType.STRING,
+                    type: Type.STRING,
                     description: "Required equipment"
                 }
             },
             required: ["targetMuscle", "equipment"]
         };
 
-        return this.generate<{ targetMuscle: string; equipment: string }>("gemini-2.5-flash", prompt, schema);
+        // Fix: Use gemini-3-flash-preview for text generation tasks.
+        return this.generate<{ targetMuscle: string; equipment: string }>("gemini-3-flash-preview", prompt, schema);
     }
 
     async healthCheck(): Promise<boolean> {
         try {
-            if (!this.apiKey) return false;
-
-            // Simple test to verify API key works
-            const testModel = this.model.getGenerativeModel({ model: "gemini-2.5-flash" });
-            const result = await testModel.generateContent("Say 'OK'");
-            return !!result.response.text();
+            // Fix: Create new instance for each call.
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const result = await ai.models.generateContent({
+                model: "gemini-3-flash-preview",
+                contents: "Say 'OK'"
+            });
+            // Fix: Access .text directly.
+            return !!result.text;
         } catch (error) {
             console.error("Gemini health check failed:", error);
             return false;
